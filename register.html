@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ลงทะเบียนร้านใหม่ - Coffee POS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    body { font-family: 'Sarabun', sans-serif; }
+    .price-card { transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
+    .price-card:hover { transform: translateY(-4px); box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
+    .price-card.selected { border: 3px solid #3b82f6; box-shadow: 0 8px 16px rgba(59,130,246,0.3); }
+    .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-purple-50 min-h-screen">
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+  <div class="bg-white p-6 rounded-lg shadow-xl">
+    <div class="spinner"></div>
+    <p class="text-center mt-4">กำลังดำเนินการ...</p>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-6 shadow-lg">
+  <div class="container mx-auto px-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold">
+          <i class="fas fa-coffee mr-2"></i>Coffee Shop POS
+        </h1>
+        <p class="text-blue-100 mt-1">ระบบจัดการร้านกาแฟแบบครบวงจร</p>
+      </div>
+      <a href="<?= ScriptApp.getService().getUrl() ?>" class="bg-white text-blue-600 px-6 py-2 rounded-lg font-semibold hover:bg-blue-50 transition">
+        <i class="fas fa-sign-in-alt mr-2"></i>เข้าสู่ระบบ
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="container mx-auto px-4 py-8">
+
+  <!-- Features Section -->
+  <div class="bg-white rounded-lg shadow-lg p-8 mb-8">
+    <h2 class="text-2xl font-bold text-center mb-6">
+      <i class="fas fa-star text-yellow-500 mr-2"></i>ฟีเจอร์ครบครัน
+    </h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="text-center p-4">
+        <div class="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="fas fa-cash-register text-blue-600 text-2xl"></i>
+        </div>
+        <h3 class="font-bold mb-2">POS ที่ใช้งานง่าย</h3>
+        <p class="text-gray-600 text-sm">รับออเดอร์รวดเร็ว รองรับหลายช่องทางชำระเงิน</p>
+      </div>
+      <div class="text-center p-4">
+        <div class="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="fas fa-chart-line text-green-600 text-2xl"></i>
+        </div>
+        <h3 class="font-bold mb-2">รายงานครบถ้วน</h3>
+        <p class="text-gray-600 text-sm">วิเคราะห์ยอดขาย ต้นทุน และกำไร แบบ Real-time</p>
+      </div>
+      <div class="text-center p-4">
+        <div class="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="fas fa-cubes text-purple-600 text-2xl"></i>
+        </div>
+        <h3 class="font-bold mb-2">จัดการสต๊อก</h3>
+        <p class="text-gray-600 text-sm">ระบบ FEFO, แจ้งเตือนวัตถุดิบใกล้หมด</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Registration Form -->
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg p-8">
+      <h2 class="text-2xl font-bold text-center mb-8">
+        <i class="fas fa-user-plus mr-2"></i>ลงทะเบียนร้านใหม่
+      </h2>
+
+      <form id="registerForm" onsubmit="handleRegister(event)">
+
+        <!-- Step 1: Basic Info -->
+        <div id="step1" class="step">
+          <h3 class="text-xl font-bold mb-4">ข้อมูลร้าน</h3>
+
+          <div class="mb-4">
+            <label class="block text-gray-700 font-semibold mb-2">ชื่อร้าน *</label>
+            <input type="text" id="shopName" required
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="เช่น ร้านกาแฟดอยช้าง">
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-gray-700 font-semibold mb-2">อีเมล (Gmail เท่านั้น) *</label>
+            <input type="email" id="email" required pattern=".*@gmail\.com$"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="example@gmail.com">
+            <p class="text-sm text-gray-500 mt-1">ใช้สำหรับเข้าสู่ระบบ</p>
+          </div>
+
+          <div class="mb-4">
+            <label class="block text-gray-700 font-semibold mb-2">รหัสผ่าน *</label>
+            <input type="password" id="password" required minlength="6"
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="อย่างน้อย 6 ตัวอักษร">
+          </div>
+
+          <div class="mb-6">
+            <label class="block text-gray-700 font-semibold mb-2">ยืนยันรหัสผ่าน *</label>
+            <input type="password" id="confirmPassword" required
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="กรอกรหัสผ่านอีกครั้ง">
+          </div>
+
+          <button type="button" onclick="goToStep2()" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">
+            ถัดไป <i class="fas fa-arrow-right ml-2"></i>
+          </button>
+        </div>
+
+        <!-- Step 2: Package Selection -->
+        <div id="step2" class="step" style="display: none;">
+          <h3 class="text-xl font-bold mb-4">เลือกแพ็คเกจ</h3>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Monthly Package -->
+            <div class="price-card border-2 border-gray-200 rounded-lg p-6" onclick="selectPackage('รายเดือน', 299)">
+              <div class="text-center">
+                <h4 class="text-xl font-bold mb-2">รายเดือน</h4>
+                <div class="text-4xl font-bold text-blue-600 mb-4">
+                  ฿299<span class="text-lg text-gray-600">/เดือน</span>
+                </div>
+                <ul class="text-left space-y-2 mb-4">
+                  <li><i class="fas fa-check text-green-500 mr-2"></i>ระบบ POS ครบครัน</li>
+                  <li><i class="fas fa-check text-green-500 mr-2"></i>รายงานและวิเคราะห์</li>
+                  <li><i class="fas fa-check text-green-500 mr-2"></i>จัดการสต๊อกวัตถุดิบ</li>
+                  <li><i class="fas fa-check text-green-500 mr-2"></i>สนับสนุนออนไลน์</li>
+                </ul>
+                <div class="bg-blue-50 p-3 rounded-lg">
+                  <p class="text-sm text-blue-800 font-semibold">เหมาะสำหรับร้านเริ่มต้น</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Yearly Package -->
+            <div class="price-card border-2 border-gray-200 rounded-lg p-6 relative" onclick="selectPackage('รายปี', 2999)">
+              <div class="absolute top-0 right-0 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-1 rounded-bl-lg rounded-tr-lg font-bold text-sm">
+                ประหยัด 41%
+              </div>
+              <div class="text-center mt-4">
+                <h4 class="text-xl font-bold mb-2">รายปี</h4>
+                <div class="text-4xl font-bold text-purple-600 mb-2">
+                  ฿2,999<span class="text-lg text-gray-600">/ปี</span>
+                </div>
+                <p class="text-sm text-gray-500 mb-4">เฉลี่ยเดือนละ ฿250</p>
+                <ul class="text-left space-y-2 mb-4">
+                  <li><i class="fas fa-check text-green-500 mr-2"></i>ทุกฟีเจอร์แบบรายเดือน</li>
+                  <li><i class="fas fa-check text-green-500 mr-2"></i>ประหยัดกว่า 1,189 บาท/ปี</li>
+                  <li><i class="fas fa-check text-green-500 mr-2"></i>สนับสนุนลำดับความสำคัญ</li>
+                  <li><i class="fas fa-check text-green-500 mr-2"></i>อัพเดทฟีเจอร์ใหม่ก่อนใคร</li>
+                </ul>
+                <div class="bg-purple-50 p-3 rounded-lg">
+                  <p class="text-sm text-purple-800 font-semibold">คุ้มค่าที่สุด!</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <input type="hidden" id="selectedPackage">
+          <input type="hidden" id="packageAmount">
+
+          <div class="flex gap-4">
+            <button type="button" onclick="goToStep1()" class="flex-1 bg-gray-500 text-white py-3 rounded-lg font-bold hover:bg-gray-600 transition">
+              <i class="fas fa-arrow-left mr-2"></i>ย้อนกลับ
+            </button>
+            <button type="button" onclick="goToStep3()" class="flex-1 bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">
+              ถัดไป <i class="fas fa-arrow-right ml-2"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 3: Payment -->
+        <div id="step3" class="step" style="display: none;">
+          <h3 class="text-xl font-bold mb-4">ชำระเงิน</h3>
+
+          <div class="bg-blue-50 p-4 rounded-lg mb-6">
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="text-gray-600">แพ็คเกจที่เลือก:</p>
+                <p class="text-xl font-bold" id="summaryPackage">-</p>
+              </div>
+              <div class="text-right">
+                <p class="text-gray-600">ยอดชำระ:</p>
+                <p class="text-3xl font-bold text-blue-600" id="summaryAmount">฿0</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-6">
+            <label class="block text-gray-700 font-semibold mb-3">เลือกช่องทางชำระเงิน</label>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label class="border-2 border-gray-200 p-4 rounded-lg cursor-pointer hover:border-blue-500 transition">
+                <input type="radio" name="paymentMethod" value="QR Code" onchange="updatePaymentMethod()" class="mr-2">
+                <i class="fas fa-qrcode text-blue-600 mr-2"></i>
+                <span class="font-semibold">สแกน QR Code</span>
+              </label>
+              <label class="border-2 border-gray-200 p-4 rounded-lg cursor-pointer hover:border-blue-500 transition">
+                <input type="radio" name="paymentMethod" value="โอนเงิน" onchange="updatePaymentMethod()" class="mr-2">
+                <i class="fas fa-university text-green-600 mr-2"></i>
+                <span class="font-semibold">โอนเงินผ่านธนาคาร</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- QR Code Section -->
+          <div id="qrCodeSection" style="display: none;" class="mb-6">
+            <div class="bg-white border-2 border-blue-500 rounded-lg p-6">
+              <h4 class="font-bold text-center mb-4">สแกน QR Code เพื่อชำระเงิน</h4>
+              <div id="qrCodeContainer" class="text-center"></div>
+              <p class="text-center text-sm text-gray-600 mt-4">
+                <i class="fas fa-info-circle mr-1"></i>PromptPay: 099-558-8665
+              </p>
+            </div>
+          </div>
+
+          <!-- Bank Transfer Section -->
+          <div id="bankTransferSection" style="display: none;" class="mb-6">
+            <div class="bg-white border-2 border-green-500 rounded-lg p-6">
+              <h4 class="font-bold text-center mb-4">โอนเงินผ่านบัญชีธนาคาร</h4>
+              <div class="space-y-2">
+                <div class="flex justify-between p-3 bg-gray-50 rounded">
+                  <span class="font-semibold">ธนาคาร:</span>
+                  <span>ธนาคารกสิกรไทย</span>
+                </div>
+                <div class="flex justify-between p-3 bg-gray-50 rounded">
+                  <span class="font-semibold">เลขบัญชี:</span>
+                  <span class="font-mono">027-1-81323-6</span>
+                </div>
+                <div class="flex justify-between p-3 bg-gray-50 rounded">
+                  <span class="font-semibold">ชื่อบัญชี:</span>
+                  <span>นายคฑาวุธ มีกุญชร</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Slip Upload -->
+          <div id="slipUploadSection" style="display: none;" class="mb-6">
+            <label class="block text-gray-700 font-semibold mb-2">แนบหลักฐานการชำระเงิน *</label>
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+              <input type="file" id="slipFile" accept="image/*" style="display: none;" onchange="previewSlip(event)">
+              <button type="button" onclick="document.getElementById('slipFile').click()" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 mb-2">
+                <i class="fas fa-upload mr-2"></i>เลือกไฟล์
+              </button>
+              <p class="text-sm text-gray-500">หรือ</p>
+              <button type="button" onclick="captureSlip()" class="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 mt-2">
+                <i class="fas fa-camera mr-2"></i>ถ่ายรูป
+              </button>
+              <div id="slipPreview" class="mt-4"></div>
+            </div>
+          </div>
+
+          <div class="flex gap-4">
+            <button type="button" onclick="goToStep2()" class="flex-1 bg-gray-500 text-white py-3 rounded-lg font-bold hover:bg-gray-600 transition">
+              <i class="fas fa-arrow-left mr-2"></i>ย้อนกลับ
+            </button>
+            <button type="submit" id="submitBtn" class="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition" disabled>
+              <i class="fas fa-check mr-2"></i>ยืนยันและส่งข้อมูล
+            </button>
+          </div>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="text-center mt-8 text-gray-600">
+    <p>&copy; 2024 Coffee Shop POS. All rights reserved.</p>
+    <p class="text-sm mt-2">ต้องการความช่วยเหลือ? ติดต่อ: admin@kpcrm.net</p>
+  </div>
+
+</div>
+
+<script>
+var currentSlipFile = null;
+var selectedPackageType = '';
+var selectedAmount = 0;
+
+function goToStep1() {
+  document.getElementById('step1').style.display = 'block';
+  document.getElementById('step2').style.display = 'none';
+  document.getElementById('step3').style.display = 'none';
+}
+
+function goToStep2() {
+  var shopName = document.getElementById('shopName').value.trim();
+  var email = document.getElementById('email').value.trim();
+  var password = document.getElementById('password').value;
+  var confirmPassword = document.getElementById('confirmPassword').value;
+
+  if (!shopName || !email || !password) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'กรุณากรอกข้อมูลให้ครบ',
+      text: 'โปรดกรอกข้อมูลทุกช่องที่มีเครื่องหมาย *'
+    });
+    return;
+  }
+
+  if (!email.endsWith('@gmail.com')) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'อีเมลไม่ถูกต้อง',
+      text: 'กรุณาใช้อีเมล Gmail เท่านั้น'
+    });
+    return;
+  }
+
+  if (password.length < 6) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'รหัสผ่านสั้นเกินไป',
+      text: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'
+    });
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    Swal.fire({
+      icon: 'error',
+      title: 'รหัสผ่านไม่ตรงกัน',
+      text: 'กรุณาตรวจสอบรหัสผ่านอีกครั้ง'
+    });
+    return;
+  }
+
+  document.getElementById('step1').style.display = 'none';
+  document.getElementById('step2').style.display = 'block';
+  document.getElementById('step3').style.display = 'none';
+}
+
+function selectPackage(packageType, amount) {
+  selectedPackageType = packageType;
+  selectedAmount = amount;
+
+  document.getElementById('selectedPackage').value = packageType;
+  document.getElementById('packageAmount').value = amount;
+
+  var cards = document.querySelectorAll('.price-card');
+  cards.forEach(function(card) {
+    card.classList.remove('selected');
+  });
+  event.currentTarget.classList.add('selected');
+
+  Swal.fire({
+    icon: 'success',
+    title: 'เลือกแพ็คเกจ' + packageType,
+    text: 'ยอดชำระ: ฿' + amount,
+    timer: 1500,
+    showConfirmButton: false
+  });
+}
+
+function goToStep3() {
+  if (!selectedPackageType) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'กรุณาเลือกแพ็คเกจ',
+      text: 'โปรดเลือกแพ็คเกจที่ต้องการก่อนดำเนินการต่อ'
+    });
+    return;
+  }
+
+  document.getElementById('summaryPackage').textContent = selectedPackageType;
+  document.getElementById('summaryAmount').textContent = '฿' + selectedAmount.toLocaleString();
+
+  document.getElementById('step1').style.display = 'none';
+  document.getElementById('step2').style.display = 'none';
+  document.getElementById('step3').style.display = 'block';
+}
+
+function updatePaymentMethod() {
+  var method = document.querySelector('input[name="paymentMethod"]:checked');
+  if (!method) return;
+
+  if (method.value === 'QR Code') {
+    document.getElementById('qrCodeSection').style.display = 'block';
+    document.getElementById('bankTransferSection').style.display = 'none';
+    generateQRCode();
+  } else {
+    document.getElementById('qrCodeSection').style.display = 'none';
+    document.getElementById('bankTransferSection').style.display = 'block';
+  }
+
+  document.getElementById('slipUploadSection').style.display = 'block';
+  checkFormComplete();
+}
+
+function generateQRCode() {
+  var amount = selectedAmount;
+  var promptpayNumber = '0995588665';
+  var qrUrl = 'https://promptpay.io/' + promptpayNumber + '/' + amount + '.png';
+
+  document.getElementById('qrCodeContainer').innerHTML = '<img src="' + qrUrl + '" alt="QR Code" style="max-width: 300px; margin: 0 auto; border: 2px solid #e5e7eb; border-radius: 8px; padding: 10px;">';
+}
+
+function previewSlip(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    currentSlipFile = e.target.result;
+    document.getElementById('slipPreview').innerHTML =
+      '<div class="relative inline-block">' +
+      '<img src="' + e.target.result + '" style="max-width: 300px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">' +
+      '<button type="button" onclick="clearSlip()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full hover:bg-red-600">' +
+      '<i class="fas fa-times"></i></button>' +
+      '</div>';
+    checkFormComplete();
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearSlip() {
+  currentSlipFile = null;
+  document.getElementById('slipPreview').innerHTML = '';
+  document.getElementById('slipFile').value = '';
+  checkFormComplete();
+}
+
+function captureSlip() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'camera';
+  input.onchange = previewSlip;
+  input.click();
+}
+
+function checkFormComplete() {
+  var method = document.querySelector('input[name="paymentMethod"]:checked');
+  var submitBtn = document.getElementById('submitBtn');
+
+  if (method && currentSlipFile) {
+    submitBtn.disabled = false;
+    submitBtn.classList.remove('opacity-50');
+  } else {
+    submitBtn.disabled = true;
+    submitBtn.classList.add('opacity-50');
+  }
+}
+
+function handleRegister(event) {
+  event.preventDefault();
+
+  if (!currentSlipFile) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'กรุณาแนบสลิป',
+      text: 'โปรดแนบหลักฐานการชำระเงิน'
+    });
+    return;
+  }
+
+  var data = {
+    shopName: document.getElementById('shopName').value,
+    email: document.getElementById('email').value,
+    password: document.getElementById('password').value,
+    packageType: selectedPackageType
+  };
+
+  document.getElementById('loadingOverlay').style.display = 'flex';
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        var regId = result.regId;
+
+        google.script.run
+          .withSuccessHandler(function(uploadResult) {
+            document.getElementById('loadingOverlay').style.display = 'none';
+
+            if (uploadResult.success) {
+              Swal.fire({
+                icon: 'success',
+                title: 'ลงทะเบียนสำเร็จ!',
+                html: '<p>รหัสลงทะเบียน: <strong>' + regId + '</strong></p>' +
+                  '<p class="text-sm text-gray-600 mt-2">เราได้รับข้อมูลของคุณแล้ว</p>' +
+                  '<p class="text-sm text-gray-600">ทีมงานจะตรวจสอบและติดต่อกลับภายใน 24 ชั่วโมง</p>',
+                confirmButtonText: 'ตกลง'
+              }).then(function() {
+                window.location.reload();
+              });
+            } else {
+              Swal.fire({
+                icon: 'error',
+                title: 'เกิดข้อผิดพลาด',
+                text: 'ไม่สามารถอัพโหลดสลิปได้ กรุณาลองใหม่อีกครั้ง'
+              });
+            }
+          })
+          .withFailureHandler(function(error) {
+            document.getElementById('loadingOverlay').style.display = 'none';
+            Swal.fire({
+              icon: 'error',
+              title: 'เกิดข้อผิดพลาด',
+              text: error.message
+            });
+          })
+          .uploadRegistrationSlip(regId, currentSlipFile);
+      } else {
+        document.getElementById('loadingOverlay').style.display = 'none';
+        Swal.fire({
+          icon: 'error',
+          title: 'เกิดข้อผิดพลาด',
+          text: result.message || 'ไม่สามารถลงทะเบียนได้'
+        });
+      }
+    })
+    .withFailureHandler(function(error) {
+      document.getElementById('loadingOverlay').style.display = 'none';
+      Swal.fire({
+        icon: 'error',
+        title: 'เกิดข้อผิดพลาด',
+        text: error.message
+      });
+    })
+    .registerNewShop(data);
+}
+</script>
+
+</body>
+</html>
