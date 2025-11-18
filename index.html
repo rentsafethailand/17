@@ -1257,8 +1257,1111 @@ function loadSettings() {
     .getSettings(currentSheetId);
 }
 
-// Continue with remaining JavaScript functions...
-// Due to length constraints, I'll create the remaining portions
+// ===== RENDER FUNCTIONS =====
+function renderProductsGrid() {
+  var grid = document.getElementById('productsGrid');
+  grid.innerHTML = '';
+
+  var searchTerm = document.getElementById('productSearch').value.toLowerCase();
+  var filtered = allProducts.filter(function(p) {
+    return p['ชื่อสินค้า'].toLowerCase().indexOf(searchTerm) !== -1 && p['สถานะ'] === 'ใช้งาน';
+  });
+
+  for (var i = 0; i < filtered.length; i++) {
+    var product = filtered[i];
+    var card = document.createElement('div');
+    card.className = 'product-card bg-white p-4 rounded-lg shadow hover:shadow-lg';
+    card.onclick = function(p) {
+      return function() { selectProduct(p); };
+    }(product);
+
+    card.innerHTML = '<div class="text-center">' +
+      '<div class="text-3xl mb-2">☕</div>' +
+      '<h4 class="font-bold mb-1">' + product['ชื่อสินค้า'] + '</h4>' +
+      '<p class="text-sm text-gray-500 mb-2">' + product['หมวดหมู่'] + '</p>' +
+      '<p class="text-lg font-bold text-blue-600">฿' + product['ราคาขาย'] + '</p>' +
+      '</div>';
+
+    grid.appendChild(card);
+  }
+}
+
+function renderCategoryButtons() {
+  var container = document.getElementById('categoryButtons');
+  container.innerHTML = '<button onclick="filterByCategory(null)" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">ทั้งหมด</button>';
+
+  for (var i = 0; i < allCategories.length; i++) {
+    var cat = allCategories[i];
+    if (cat['สถานะ'] === 'ใช้งาน') {
+      var btn = document.createElement('button');
+      btn.className = 'px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300';
+      btn.textContent = cat['ชื่อหมวดหมู่'];
+      btn.onclick = function(c) {
+        return function() { filterByCategory(c); };
+      }(cat['ชื่อหมวดหมู่']);
+      container.appendChild(btn);
+    }
+  }
+}
+
+function filterByCategory(category) {
+  if (!category) {
+    renderProductsGrid();
+    return;
+  }
+
+  var grid = document.getElementById('productsGrid');
+  grid.innerHTML = '';
+
+  var filtered = allProducts.filter(function(p) {
+    return p['หมวดหมู่'] === category && p['สถานะ'] === 'ใช้งาน';
+  });
+
+  for (var i = 0; i < filtered.length; i++) {
+    var product = filtered[i];
+    var card = document.createElement('div');
+    card.className = 'product-card bg-white p-4 rounded-lg shadow hover:shadow-lg';
+    card.onclick = function(p) {
+      return function() { selectProduct(p); };
+    }(product);
+
+    card.innerHTML = '<div class="text-center">' +
+      '<div class="text-3xl mb-2">☕</div>' +
+      '<h4 class="font-bold mb-1">' + product['ชื่อสินค้า'] + '</h4>' +
+      '<p class="text-sm text-gray-500 mb-2">' + product['หมวดหมู่'] + '</p>' +
+      '<p class="text-lg font-bold text-blue-600">฿' + product['ราคาขาย'] + '</p>' +
+      '</div>';
+
+    grid.appendChild(card);
+  }
+}
+
+function filterProducts() {
+  renderProductsGrid();
+}
+
+function updateChannelSelect() {
+  var select = document.getElementById('orderChannel');
+  select.innerHTML = '';
+
+  for (var i = 0; i < allChannels.length; i++) {
+    if (allChannels[i]['สถานะ'] === 'ใช้งาน') {
+      var option = document.createElement('option');
+      option.value = allChannels[i]['ชื่อช่องทาง'];
+      option.textContent = allChannels[i]['ชื่อช่องทาง'];
+      option.setAttribute('data-type', allChannels[i]['ประเภทเลขออเดอร์']);
+      select.appendChild(option);
+    }
+  }
+}
+
+function updateCategorySelects() {
+  var selects = document.querySelectorAll('#productCategory');
+  for (var s = 0; s < selects.length; s++) {
+    selects[s].innerHTML = '<option value="">เลือกหมวดหมู่</option>';
+    for (var i = 0; i < allCategories.length; i++) {
+      if (allCategories[i]['สถานะ'] === 'ใช้งาน') {
+        var option = document.createElement('option');
+        option.value = allCategories[i]['ชื่อหมวดหมู่'];
+        option.textContent = allCategories[i]['ชื่อหมวดหมู่'];
+        selects[s].appendChild(option);
+      }
+    }
+  }
+}
+
+function updateMaterialSelects() {
+  // Will be called when material dropdowns are created
+}
+
+// ===== PRODUCT SELECTION =====
+function selectProduct(product) {
+  selectedProduct = product;
+  document.getElementById('selectedProductName').textContent = product['ชื่อสินค้า'];
+  document.getElementById('productQuantity').value = 1;
+  document.getElementById('productNote').value = '';
+
+  var optionsContainer = document.getElementById('productOptionsContainer');
+  optionsContainer.innerHTML = '';
+
+  var productOptions = [];
+  try {
+    productOptions = product['ตัวเลือก'] || [];
+  } catch (e) {}
+
+  var basePrice = parseFloat(product['ราคาขาย']);
+  document.getElementById('modalProductPrice').textContent = basePrice.toFixed(2);
+
+  openModal('productSelectionModal');
+}
+
+function increaseQuantity() {
+  var input = document.getElementById('productQuantity');
+  input.value = parseInt(input.value) + 1;
+}
+
+function decreaseQuantity() {
+  var input = document.getElementById('productQuantity');
+  if (parseInt(input.value) > 1) {
+    input.value = parseInt(input.value) - 1;
+  }
+}
+
+// ===== CART MANAGEMENT =====
+function addToCart() {
+  if (!selectedProduct) return;
+
+  var quantity = parseInt(document.getElementById('productQuantity').value);
+  var note = document.getElementById('productNote').value;
+  var price = parseFloat(selectedProduct['ราคาขาย']);
+  var cost = parseFloat(selectedProduct['ราคาทุน']) || 0;
+  var time = parseFloat(selectedProduct['เวลาทำ(นาที)']) || 3;
+
+  var materials = [];
+  try {
+    materials = selectedProduct['วัตถุดิบ'] || [];
+  } catch (e) {}
+
+  var item = {
+    id: selectedProduct['รหัสสินค้า'],
+    name: selectedProduct['ชื่อสินค้า'],
+    quantity: quantity,
+    price: price,
+    cost: cost,
+    total: price * quantity,
+    note: note,
+    time: time,
+    materials: materials
+  };
+
+  cart.push(item);
+  updateCart();
+  closeModal('productSelectionModal');
+  showToast('เพิ่มลงตะกร้าแล้ว', 'success');
+}
+
+function updateCart() {
+  var container = document.getElementById('cartItems');
+  container.innerHTML = '';
+
+  if (cart.length === 0) {
+    container.innerHTML = '<p class="text-gray-500 text-center py-4">ไม่มีสินค้าในตะกร้า</p>';
+  }
+
+  for (var i = 0; i < cart.length; i++) {
+    var item = cart[i];
+    var div = document.createElement('div');
+    div.className = 'cart-item';
+    div.innerHTML = '<div class="flex justify-between items-start">' +
+      '<div class="flex-1">' +
+      '<p class="font-semibold">' + item.name + '</p>' +
+      '<p class="text-sm text-gray-500">฿' + item.price + ' x ' + item.quantity + '</p>' +
+      (item.note ? '<p class="text-xs text-gray-400">หมายเหตุ: ' + item.note + '</p>' : '') +
+      '</div>' +
+      '<div class="text-right">' +
+      '<p class="font-bold">฿' + item.total.toFixed(2) + '</p>' +
+      '<button onclick="removeFromCart(' + i + ')" class="text-red-500 text-sm hover:text-red-700">' +
+      '<i class="fas fa-trash"></i></button>' +
+      '</div></div>';
+    container.appendChild(div);
+  }
+
+  updateCartTotals();
+}
+
+function removeFromCart(index) {
+  cart.splice(index, 1);
+  updateCart();
+}
+
+function clearCart() {
+  if (cart.length === 0) return;
+
+  Swal.fire({
+    title: 'ล้างตะกร้า?',
+    text: 'คุณต้องการล้างสินค้าในตะกร้าทั้งหมดหรือไม่?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'ใช่, ล้างเลย',
+    cancelButtonText: 'ยกเลิก'
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      cart = [];
+      updateCart();
+      showToast('ล้างตะกร้าแล้ว', 'success');
+    }
+  });
+}
+
+function updateCartTotals() {
+  var subtotal = 0;
+  for (var i = 0; i < cart.length; i++) {
+    subtotal += cart[i].total;
+  }
+
+  var discount = parseFloat(document.getElementById('cartDiscount').value) || 0;
+  var tax = 0;
+
+  if (settings['เปิดภาษี'] === 'true') {
+    if (settings['ประเภทภาษี'] === 'รวมในราคา') {
+      tax = subtotal - (subtotal / 1.07);
+    } else {
+      tax = subtotal * 0.07;
+    }
+  }
+
+  var total = subtotal + tax - discount;
+
+  document.getElementById('cartSubtotal').textContent = '฿' + subtotal.toFixed(2);
+  document.getElementById('cartTax').textContent = '฿' + tax.toFixed(2);
+  document.getElementById('cartTotal').textContent = '฿' + total.toFixed(2);
+}
+
+// ===== PAYMENT =====
+function openPaymentModal() {
+  if (cart.length === 0) {
+    showToast('กรุณาเลือกสินค้าก่อน', 'warning');
+    return;
+  }
+
+  var selectedChannel = document.getElementById('orderChannel');
+  var channelType = selectedChannel.options[selectedChannel.selectedIndex].getAttribute('data-type');
+
+  if (channelType === 'manual') {
+    document.getElementById('manualOrderIdSection').style.display = 'block';
+  } else {
+    document.getElementById('manualOrderIdSection').style.display = 'none';
+  }
+
+  var summary = '';
+  for (var i = 0; i < cart.length; i++) {
+    var item = cart[i];
+    summary += '<div class="flex justify-between mb-1">' +
+      '<span>' + item.name + ' x ' + item.quantity + '</span>' +
+      '<span>฿' + item.total.toFixed(2) + '</span></div>';
+  }
+
+  document.getElementById('paymentSummary').innerHTML = summary;
+
+  var total = parseFloat(document.getElementById('cartTotal').textContent.replace('฿', ''));
+  document.getElementById('paymentTotal').textContent = '฿' + total.toFixed(2);
+
+  document.querySelectorAll('.payment-method').forEach(function(cb) {
+    cb.checked = false;
+  });
+  document.getElementById('qrCodeSection').style.display = 'none';
+  document.getElementById('slipUploadSection').style.display = 'none';
+  currentSlipFile = null;
+
+  openModal('paymentModal');
+}
+
+function updatePaymentMethods() {
+  var checkboxes = document.querySelectorAll('.payment-method:checked');
+  var showQR = false;
+  var showSlip = false;
+
+  checkboxes.forEach(function(cb) {
+    var value = cb.value;
+    var amountInput = document.getElementById(value === 'เงินสด' ? 'cashAmount' : value === 'โอนเงิน' ? 'transferAmount' : 'qrAmount');
+    if (amountInput) {
+      amountInput.style.display = 'block';
+    }
+
+    if (value === 'QR Code') {
+      showQR = true;
+    }
+    if (value === 'โอนเงิน' || value === 'QR Code') {
+      showSlip = true;
+    }
+  });
+
+  document.querySelectorAll('.payment-method').forEach(function(cb) {
+    if (!cb.checked) {
+      var amountInput = document.getElementById(cb.value === 'เงินสด' ? 'cashAmount' : cb.value === 'โอนเงิน' ? 'transferAmount' : 'qrAmount');
+      if (amountInput) {
+        amountInput.style.display = 'none';
+        amountInput.value = '';
+      }
+    }
+  });
+
+  document.getElementById('qrCodeSection').style.display = showQR ? 'block' : 'none';
+  document.getElementById('slipUploadSection').style.display = showSlip ? 'block' : 'none';
+
+  if (showQR) {
+    generateQRCode();
+  }
+}
+
+function generateQRCode() {
+  var total = parseFloat(document.getElementById('paymentTotal').textContent.replace('฿', ''));
+  var qrAmount = parseFloat(document.getElementById('qrAmount').value) || total;
+  var promptpayNumber = settings['หมายเลขพร้อมเพย์'] || '0995588665';
+
+  var qrUrl = 'https://promptpay.io/' + promptpayNumber + '/' + qrAmount + '.png';
+
+  document.getElementById('qrCodeContainer').innerHTML = '<img src="' + qrUrl + '" alt="QR Code" style="max-width: 300px; margin: 0 auto;">';
+}
+
+function previewSlip(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    currentSlipFile = e.target.result;
+    document.getElementById('slipPreview').innerHTML = '<img src="' + e.target.result + '" style="max-width: 200px; margin-top: 10px;">' +
+      '<button onclick="clearSlip()" class="bg-red-500 text-white px-2 py-1 rounded mt-2 text-sm">ลบรูป</button>';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearSlip() {
+  currentSlipFile = null;
+  document.getElementById('slipPreview').innerHTML = '';
+  document.getElementById('slipFile').value = '';
+}
+
+function captureSlip() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'camera';
+  input.onchange = previewSlip;
+  input.click();
+}
+
+function confirmPayment() {
+  var selectedChannel = document.getElementById('orderChannel').value;
+  var channelOption = document.querySelector('#orderChannel option:checked');
+  var channelType = channelOption.getAttribute('data-type');
+
+  var manualOrderId = '';
+  if (channelType === 'manual') {
+    manualOrderId = document.getElementById('manualOrderId').value.trim();
+    if (!manualOrderId) {
+      showToast('กรุณากรอกหมายเลข Order', 'warning');
+      return;
+    }
+  }
+
+  var checkboxes = document.querySelectorAll('.payment-method:checked');
+  if (checkboxes.length === 0) {
+    showToast('กรุณาเลือกช่องทางการชำระเงิน', 'warning');
+    return;
+  }
+
+  var payments = [];
+  var totalPayment = 0;
+
+  checkboxes.forEach(function(cb) {
+    var method = cb.value;
+    var amount = 0;
+
+    if (method === 'เงินสด') {
+      amount = parseFloat(document.getElementById('cashAmount').value) || 0;
+    } else if (method === 'โอนเงิน') {
+      amount = parseFloat(document.getElementById('transferAmount').value) || 0;
+    } else if (method === 'QR Code') {
+      amount = parseFloat(document.getElementById('qrAmount').value) || 0;
+    }
+
+    if (amount > 0) {
+      payments.push({ method: method, amount: amount });
+      totalPayment += amount;
+    }
+  });
+
+  var orderTotal = parseFloat(document.getElementById('paymentTotal').textContent.replace('฿', ''));
+
+  if (Math.abs(totalPayment - orderTotal) > 0.01) {
+    showToast('ยอดชำระไม่ตรงกับยอดรวม', 'warning');
+    return;
+  }
+
+  showLoading();
+
+  var orderData = {
+    channel: selectedChannel,
+    manualOrderId: manualOrderId,
+    items: cart.map(function(item) {
+      return {
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        cost: item.cost,
+        total: item.total,
+        note: item.note,
+        time: item.time,
+        materials: item.materials
+      };
+    }),
+    subtotal: parseFloat(document.getElementById('cartSubtotal').textContent.replace('฿', '')),
+    discount: parseFloat(document.getElementById('cartDiscount').value) || 0,
+    payments: payments,
+    slipUrl: ''
+  };
+
+  if (currentSlipFile) {
+    var fileName = 'slip_' + new Date().getTime() + '.png';
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success) {
+          orderData.slipUrl = result.url;
+          createOrderFinal(orderData);
+        } else {
+          hideLoading();
+          showToast('ไม่สามารถอัพโหลดสลิปได้', 'error');
+        }
+      })
+      .withFailureHandler(function(error) {
+        hideLoading();
+        showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+      })
+      .uploadSlipImage(currentSheetId, currentSlipFile, fileName);
+  } else {
+    createOrderFinal(orderData);
+  }
+}
+
+function createOrderFinal(orderData) {
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        closeModal('paymentModal');
+        cart = [];
+        updateCart();
+        document.getElementById('cartDiscount').value = 0;
+        currentSlipFile = null;
+        document.getElementById('slipPreview').innerHTML = '';
+
+        Swal.fire({
+          icon: 'success',
+          title: 'บันทึกออเดอร์สำเร็จ!',
+          html: '<p>รหัสออเดอร์: <strong>' + result.orderId + '</strong></p>' +
+            '<p>หมายเลขคิว: <strong>' + result.queueNumber + '</strong></p>' +
+            '<p>เวลารอโดยประมาณ: <strong>' + result.estimatedTime + ' นาที</strong></p>',
+          confirmButtonText: 'พิมพ์ใบเสร็จ',
+          showCancelButton: true,
+          cancelButtonText: 'ปิด'
+        }).then(function(res) {
+          if (res.isConfirmed) {
+            printReceiptById(result.orderId);
+          }
+        });
+
+        loadTodaySales();
+        updateQueueInfo();
+      } else {
+        showToast('ไม่สามารถบันทึกออเดอร์ได้', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+    })
+    .createOrder(currentSheetId, orderData);
+}
+
+// ===== DASHBOARD =====
+function loadDashboard() {
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(data) {
+      hideLoading();
+
+      document.getElementById('dashTodaySales').textContent = '฿' + data.todaySales.toFixed(2);
+      document.getElementById('dashTodayCost').textContent = '฿' + data.todayCost.toFixed(2);
+      document.getElementById('dashProfit').textContent = '฿' + data.profit.toFixed(2);
+
+      renderTopProducts(data.topProducts);
+      renderExpiringMaterials(data.expiringMaterials);
+      renderSales7DaysChart(data.last7Days);
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('ไม่สามารถโหลด Dashboard ได้', 'error');
+    })
+    .getDashboardData(currentSheetId);
+}
+
+function renderTopProducts(products) {
+  var container = document.getElementById('topProductsList');
+  container.innerHTML = '';
+
+  if (products.length === 0) {
+    container.innerHTML = '<p class="text-gray-500 text-center">ยังไม่มีข้อมูล</p>';
+    return;
+  }
+
+  for (var i = 0; i < products.length; i++) {
+    var p = products[i];
+    var div = document.createElement('div');
+    div.className = 'flex justify-between items-center mb-3 p-3 bg-gray-50 rounded-lg';
+    div.innerHTML = '<div>' +
+      '<p class="font-semibold">' + (i + 1) + '. ' + p.name + '</p>' +
+      '<p class="text-sm text-gray-500">ขาย ' + p.quantity + ' แก้ว</p>' +
+      '</div>' +
+      '<div class="text-right">' +
+      '<p class="font-bold text-green-600">฿' + p.revenue.toFixed(2) + '</p>' +
+      '</div>';
+    container.appendChild(div);
+  }
+}
+
+function renderExpiringMaterials(materials) {
+  var container = document.getElementById('expiringMaterialsList');
+  container.innerHTML = '';
+
+  if (materials.length === 0) {
+    container.innerHTML = '<p class="text-gray-500 text-center">ไม่มีวัตถุดิบใกล้หมดอายุ</p>';
+    return;
+  }
+
+  for (var i = 0; i < materials.length; i++) {
+    var m = materials[i];
+    var expiryDate = new Date(m.expiryDate);
+    var div = document.createElement('div');
+    div.className = 'flex justify-between items-center mb-2 p-3 bg-yellow-50 rounded-lg';
+    div.innerHTML = '<div>' +
+      '<p class="font-semibold">' + m.materialName + '</p>' +
+      '<p class="text-sm text-gray-600">คงเหลือ: ' + m.remaining + '</p>' +
+      '</div>' +
+      '<div class="text-right">' +
+      '<p class="text-sm font-semibold text-red-600">หมดอายุ: ' + expiryDate.toLocaleDateString('th-TH') + '</p>' +
+      '</div>';
+    container.appendChild(div);
+  }
+}
+
+function renderSales7DaysChart(data) {
+  var ctx = document.getElementById('sales7DaysChart');
+  if (!ctx) return;
+
+  if (window.sales7DaysChartInstance) {
+    window.sales7DaysChartInstance.destroy();
+  }
+
+  var labels = [];
+  var values = [];
+  for (var i = 0; i < data.length; i++) {
+    labels.push(data[i].date);
+    values.push(data[i].total);
+  }
+
+  window.sales7DaysChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'ยอดขาย (฿)',
+        data: values,
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          display: false
+        }
+      }
+    }
+  });
+}
+
+// ===== TODAY SALES =====
+function loadTodaySales() {
+  google.script.run
+    .withSuccessHandler(function(sales) {
+      renderTodaySalesTable(sales);
+    })
+    .withFailureHandler(function(error) {
+      showToast('ไม่สามารถโหลดประวัติการขายได้', 'error');
+    })
+    .getTodaySales(currentSheetId);
+}
+
+function renderTodaySalesTable(sales) {
+  var tbody = document.getElementById('todaySalesTable');
+  tbody.innerHTML = '';
+
+  if (sales.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">ยังไม่มีรายการขาย</td></tr>';
+    return;
+  }
+
+  for (var i = 0; i < sales.length; i++) {
+    var sale = sales[i];
+    var row = document.createElement('tr');
+    row.className = 'border-b hover:bg-gray-50';
+
+    var statusBadge = '';
+    if (sale['สถานะ'] === 'รอทำ') {
+      statusBadge = '<span class="badge badge-warning">รอทำ</span>';
+    } else if (sale['สถานะ'] === 'กำลังทำ') {
+      statusBadge = '<span class="badge badge-info">กำลังทำ</span>';
+    } else if (sale['สถานะ'] === 'พร้อมเสิร์ฟ') {
+      statusBadge = '<span class="badge badge-success">พร้อมเสิร์ฟ</span>';
+    } else {
+      statusBadge = '<span class="badge badge-secondary">เสร็จสิ้น</span>';
+    }
+
+    row.innerHTML = '<td class="px-4 py-2">' + sale['รหัสออเดอร์'] + '</td>' +
+      '<td class="px-4 py-2">' + sale['เวลา'] + '</td>' +
+      '<td class="px-4 py-2">' + sale['ช่องทาง'] + '</td>' +
+      '<td class="px-4 py-2 text-right">฿' + parseFloat(sale['ยอดสุทธิ']).toFixed(2) + '</td>' +
+      '<td class="px-4 py-2 text-center">' + statusBadge + '</td>' +
+      '<td class="px-4 py-2 text-center">' +
+      '<button onclick="viewOrderDetails(\'' + sale['รหัสออเดอร์'] + '\')" class="text-blue-600 hover:text-blue-800 mr-2" title="ดูรายละเอียด">' +
+      '<i class="fas fa-eye"></i></button>' +
+      '<button onclick="deleteOrderConfirm(\'' + sale['รหัสออเดอร์'] + '\')" class="text-red-600 hover:text-red-800" title="ลบ">' +
+      '<i class="fas fa-trash"></i></button>' +
+      '</td>';
+
+    tbody.appendChild(row);
+  }
+}
+
+function updateQueueInfo() {
+  google.script.run
+    .withSuccessHandler(function(queue) {
+      var totalQueue = queue.length;
+      var totalTime = 0;
+
+      for (var i = 0; i < queue.length; i++) {
+        totalTime += parseFloat(queue[i]['เวลาที่ใช้(นาที)']) || 0;
+      }
+
+      document.getElementById('currentQueueCount').textContent = totalQueue;
+      document.getElementById('currentWaitTime').textContent = totalTime;
+    })
+    .getActiveQueue(currentSheetId);
+}
+
+function viewOrderDetails(orderId) {
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(order) {
+      hideLoading();
+      if (order) {
+        displayOrderDetails(order);
+      } else {
+        showToast('ไม่พบข้อมูลออเดอร์', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('เกิดข้อผิดพลาด', 'error');
+    })
+    .getOrderDetails(currentSheetId, orderId);
+}
+
+function displayOrderDetails(order) {
+  var content = '<div class="space-y-4">';
+  content += '<div class="grid grid-cols-2 gap-4">';
+  content += '<div><strong>รหัสออเดอร์:</strong> ' + order['รหัสออเดอร์'] + '</div>';
+  content += '<div><strong>วันที่:</strong> ' + new Date(order['วันที่']).toLocaleDateString('th-TH') + '</div>';
+  content += '<div><strong>เวลา:</strong> ' + order['เวลา'] + '</div>';
+  content += '<div><strong>ช่องทาง:</strong> ' + order['ช่องทาง'] + '</div>';
+  content += '</div>';
+
+  content += '<div><strong>รายการสินค้า:</strong></div>';
+  content += '<table class="w-full">';
+  content += '<thead><tr class="bg-gray-100"><th class="px-2 py-1 text-left">สินค้า</th><th class="px-2 py-1 text-center">จำนวน</th><th class="px-2 py-1 text-right">ราคา</th></tr></thead>';
+  content += '<tbody>';
+
+  var items = order['รายการสินค้า'] || [];
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    content += '<tr class="border-b">';
+    content += '<td class="px-2 py-1">' + item.name + (item.note ? '<br><small class="text-gray-500">' + item.note + '</small>' : '') + '</td>';
+    content += '<td class="px-2 py-1 text-center">' + item.quantity + '</td>';
+    content += '<td class="px-2 py-1 text-right">฿' + item.total.toFixed(2) + '</td>';
+    content += '</tr>';
+  }
+
+  content += '</tbody></table>';
+
+  content += '<div class="text-right space-y-1">';
+  content += '<div>ยอดรวม: <strong>฿' + parseFloat(order['ยอดรวม']).toFixed(2) + '</strong></div>';
+  content += '<div>ส่วนลด: <strong>฿' + parseFloat(order['ส่วนลด']).toFixed(2) + '</strong></div>';
+  content += '<div>ภาษี: <strong>฿' + parseFloat(order['ภาษี']).toFixed(2) + '</strong></div>';
+  content += '<div class="text-xl text-blue-600">ยอดสุทธิ: <strong>฿' + parseFloat(order['ยอดสุทธิ']).toFixed(2) + '</strong></div>';
+  content += '</div>';
+
+  if (order['รูปสลิป']) {
+    content += '<div><strong>สลิปการโอนเงิน:</strong><br>';
+    content += '<a href="' + order['รูปสลิป'] + '" target="_blank" class="text-blue-600 hover:underline">ดูสลิป</a></div>';
+  }
+
+  content += '</div>';
+
+  document.getElementById('orderDetailsContent').innerHTML = content;
+  openModal('orderDetailsModal');
+}
+
+function deleteOrderConfirm(orderId) {
+  Swal.fire({
+    title: 'ลบออเดอร์?',
+    text: 'คุณต้องการลบออเดอร์นี้หรือไม่?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'ใช่, ลบเลย',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#ef4444'
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      deleteOrder(orderId);
+    }
+  });
+}
+
+function deleteOrder(orderId) {
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        showToast('ลบออเดอร์สำเร็จ', 'success');
+        loadTodaySales();
+        updateQueueInfo();
+      } else {
+        showToast('ไม่สามารถลบออเดอร์ได้', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('เกิดข้อผิดพลาด', 'error');
+    })
+    .deleteOrder(currentSheetId, orderId);
+}
+
+function printReceipt() {
+  window.print();
+}
+
+function printReceiptById(orderId) {
+  // Simple print implementation
+  window.print();
+}
+
+// ===== KITCHEN QUEUE =====
+function loadKitchenQueue() {
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(queue) {
+      hideLoading();
+      renderKitchenQueue(queue);
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('ไม่สามารถโหลดคิวได้', 'error');
+    })
+    .getActiveQueue(currentSheetId);
+}
+
+function renderKitchenQueue(queue) {
+  var container = document.getElementById('kitchenQueue');
+  container.innerHTML = '';
+
+  document.getElementById('kitchenTotalQueue').textContent = queue.length;
+
+  if (queue.length === 0) {
+    container.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">ไม่มีคิว</div>';
+    return;
+  }
+
+  for (var i = 0; i < queue.length; i++) {
+    var q = queue[i];
+    var card = document.createElement('div');
+    card.className = 'bg-white p-4 rounded-lg shadow-lg';
+
+    var statusBadge = q['สถานะ'] === 'รอทำ' ? 'badge-warning' : 'badge-info';
+
+    var items = q['รายการ'] || [];
+    var itemsHtml = '';
+    for (var j = 0; j < items.length; j++) {
+      itemsHtml += '<li>' + items[j].name + ' x ' + items[j].quantity;
+      if (items[j].note) itemsHtml += ' (' + items[j].note + ')';
+      itemsHtml += '</li>';
+    }
+
+    card.innerHTML = '<div class="flex justify-between items-start mb-3">' +
+      '<div>' +
+      '<h3 class="text-2xl font-bold text-blue-600">คิว #' + q['หมายเลขคิว'] + '</h3>' +
+      '<p class="text-sm text-gray-500">' + q['รหัสออเดอร์'] + '</p>' +
+      '</div>' +
+      '<span class="badge ' + statusBadge + '">' + q['สถานะ'] + '</span>' +
+      '</div>' +
+      '<div class="mb-3">' +
+      '<strong>รายการ:</strong>' +
+      '<ul class="list-disc list-inside text-sm mt-1">' + itemsHtml + '</ul>' +
+      '</div>' +
+      '<div class="text-sm text-gray-600 mb-3">' +
+      '<i class="fas fa-clock mr-1"></i>เวลา: ' + new Date(q['เวลาสั่ง']).toLocaleTimeString('th-TH') +
+      ' | ใช้เวลา: ' + q['เวลาที่ใช้(นาที)'] + ' นาที' +
+      '</div>' +
+      '<div class="flex gap-2">' +
+      '<button onclick="updateQueueStatus(\'' + q['รหัสออเดอร์'] + '\', \'พร้อมเสิร์ฟ\')" class="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600">' +
+      '<i class="fas fa-check mr-1"></i>พร้อมเสิร์ฟ</button>' +
+      '<button onclick="viewOrderDetails(\'' + q['รหัสออเดอร์'] + '\')" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">' +
+      '<i class="fas fa-eye"></i></button>' +
+      '</div>';
+
+    container.appendChild(card);
+  }
+}
+
+function updateQueueStatus(orderId, status) {
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        showToast('อัพเดทสถานะสำเร็จ', 'success');
+        loadKitchenQueue();
+      } else {
+        showToast('ไม่สามารถอัพเดทสถานะได้', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('เกิดข้อผิดพลาด', 'error');
+    })
+    .updateOrderStatus(currentSheetId, orderId, status);
+}
+
+// ===== SALES HISTORY =====
+function setDefaultDates() {
+  var today = new Date();
+  var startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  document.getElementById('historyStartDate').value = formatDate(startDate);
+  document.getElementById('historyEndDate').value = formatDate(today);
+
+  var currentMonth = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+  document.getElementById('plMonth').value = currentMonth;
+}
+
+function formatDate(date) {
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
+}
+
+function loadSalesHistory() {
+  var startDate = document.getElementById('historyStartDate').value;
+  var endDate = document.getElementById('historyEndDate').value;
+
+  if (!startDate || !endDate) return;
+
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(sales) {
+      hideLoading();
+      salesHistoryData = sales;
+      renderSalesHistory(sales);
+      calculateHistorySummary(sales);
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('ไม่สามารถโหลดประวัติการขายได้', 'error');
+    })
+    .getSalesByDateRange(currentSheetId, startDate, endDate);
+}
+
+function renderSalesHistory(sales) {
+  var tbody = document.getElementById('historyTable');
+  tbody.innerHTML = '';
+
+  if (sales.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">ไม่มีรายการขาย</td></tr>';
+    return;
+  }
+
+  for (var i = 0; i < sales.length; i++) {
+    var sale = sales[i];
+    var row = document.createElement('tr');
+    row.className = 'border-b hover:bg-gray-50';
+
+    var date = new Date(sale['วันที่']);
+    var statusBadge = '<span class="badge badge-success">เสร็จสิ้น</span>';
+
+    row.innerHTML = '<td class="px-4 py-2">' + sale['รหัสออเดอร์'] + '</td>' +
+      '<td class="px-4 py-2">' + date.toLocaleDateString('th-TH') + ' ' + sale['เวลา'] + '</td>' +
+      '<td class="px-4 py-2">' + sale['ช่องทาง'] + '</td>' +
+      '<td class="px-4 py-2 text-right">฿' + parseFloat(sale['ยอดสุทธิ']).toFixed(2) + '</td>' +
+      '<td class="px-4 py-2 text-center">' + statusBadge + '</td>' +
+      '<td class="px-4 py-2 text-center">' +
+      '<button onclick="viewOrderDetails(\'' + sale['รหัสออเดอร์'] + '\')" class="text-blue-600 hover:text-blue-800">' +
+      '<i class="fas fa-eye"></i></button>' +
+      '</td>';
+
+    tbody.appendChild(row);
+  }
+}
+
+function calculateHistorySummary(sales) {
+  var total = 0;
+  var productCount = {};
+
+  for (var i = 0; i < sales.length; i++) {
+    total += parseFloat(sales[i]['ยอดสุทธิ']);
+
+    var items = sales[i]['รายการสินค้า'] || [];
+    for (var j = 0; j < items.length; j++) {
+      var name = items[j].name;
+      if (!productCount[name]) {
+        productCount[name] = 0;
+      }
+      productCount[name] += items[j].quantity;
+    }
+  }
+
+  var topProduct = '';
+  var maxCount = 0;
+  for (var name in productCount) {
+    if (productCount[name] > maxCount) {
+      maxCount = productCount[name];
+      topProduct = name;
+    }
+  }
+
+  document.getElementById('historySalesTotal').textContent = '฿' + total.toFixed(2);
+  document.getElementById('historyOrderCount').textContent = sales.length;
+  document.getElementById('historyAvgOrder').textContent = sales.length > 0 ? '฿' + (total / sales.length).toFixed(2) : '฿0';
+  document.getElementById('historyTopProduct').textContent = topProduct || '-';
+}
+
+function sortHistoryTable(column) {
+  if (currentSortColumn === column) {
+    currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    currentSortColumn = column;
+    currentSortDirection = 'asc';
+  }
+
+  salesHistoryData.sort(function(a, b) {
+    var aVal = a[column];
+    var bVal = b[column];
+
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      return currentSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+    } else {
+      if (aVal < bVal) return currentSortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return currentSortDirection === 'asc' ? 1 : -1;
+      return 0;
+    }
+  });
+
+  renderSalesHistory(salesHistoryData);
+}
+
+function loadSalesCharts() {
+  var today = new Date();
+  var currentYear = today.getFullYear().toString();
+  var currentMonth = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      renderMonthlySalesChart(data);
+    })
+    .getMonthlySalesData(currentSheetId, currentYear);
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      renderDailySalesChart(data);
+    })
+    .getDailySalesInMonth(currentSheetId, currentMonth);
+}
+
+function renderMonthlySalesChart(data) {
+  var ctx = document.getElementById('monthlySalesChart');
+  if (!ctx) return;
+
+  if (window.monthlySalesChartInstance) {
+    window.monthlySalesChartInstance.destroy();
+  }
+
+  var labels = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+  var values = [];
+
+  for (var i = 1; i <= 12; i++) {
+    var key = String(i).padStart(2, '0');
+    values.push(data[key] || 0);
+  }
+
+  window.monthlySalesChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'ยอดขาย (฿)',
+        data: values,
+        backgroundColor: 'rgba(59, 130, 246, 0.7)'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          display: false
+        }
+      }
+    }
+  });
+}
+
+function renderDailySalesChart(data) {
+  var ctx = document.getElementById('dailySalesChart');
+  if (!ctx) return;
+
+  if (window.dailySalesChartInstance) {
+    window.dailySalesChartInstance.destroy();
+  }
+
+  var labels = [];
+  var values = [];
+
+  for (var day in data) {
+    labels.push(day);
+    values.push(data[day]);
+  }
+
+  window.dailySalesChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'ยอดขาย (฿)',
+        data: values,
+        backgroundColor: 'rgba(16, 185, 129, 0.7)'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          display: false
+        }
+      }
+    }
+  });
+}
+
+// Due to character limit, I'll continue in the next message with:
+// - Products management
+// - Materials management
+// - Costs management
+// - Reports
+// - Settings
+// - All modals
+
+// Continue in next commit...
 
 </script>
 
