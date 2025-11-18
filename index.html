@@ -2353,15 +2353,715 @@ function renderDailySalesChart(data) {
   });
 }
 
-// Due to character limit, I'll continue in the next message with:
-// - Products management
-// - Materials management
-// - Costs management
-// - Reports
-// - Settings
-// - All modals
+// ===== PRODUCTS MANAGEMENT =====
+function loadProductsTable() {
+  var tbody = document.getElementById('productsTable');
+  tbody.innerHTML = '';
 
-// Continue in next commit...
+  if (allProducts.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500">ไม่มีสินค้า</td></tr>';
+    return;
+  }
+
+  for (var i = 0; i < allProducts.length; i++) {
+    var product = allProducts[i];
+    if (product['สถานะ'] !== 'ใช้งาน') continue;
+
+    var row = document.createElement('tr');
+    row.className = 'border-b hover:bg-gray-50';
+
+    var price = parseFloat(product['ราคาขาย']);
+    var cost = parseFloat(product['ราคาทุน']) || 0;
+    var profit = price - cost;
+
+    row.innerHTML = '<td class="px-4 py-2">' + product['รหัสสินค้า'] + '</td>' +
+      '<td class="px-4 py-2">' + product['ชื่อสินค้า'] + '</td>' +
+      '<td class="px-4 py-2">' + product['หมวดหมู่'] + '</td>' +
+      '<td class="px-4 py-2 text-right">฿' + price.toFixed(2) + '</td>' +
+      '<td class="px-4 py-2 text-right">฿' + cost.toFixed(2) + '</td>' +
+      '<td class="px-4 py-2 text-right">฿' + profit.toFixed(2) + '</td>' +
+      '<td class="px-4 py-2 text-center">' + (product['เวลาทำ(นาที)'] || 3) + ' นาที</td>' +
+      '<td class="px-4 py-2 text-center">' +
+      '<button onclick="editProduct(\'' + product['รหัสสินค้า'] + '\')" class="text-blue-600 hover:text-blue-800 mr-2">' +
+      '<i class="fas fa-edit"></i></button>' +
+      '<button onclick="deleteProductConfirm(\'' + product['รหัสสินค้า'] + '\')" class="text-red-600 hover:text-red-800">' +
+      '<i class="fas fa-trash"></i></button>' +
+      '</td>';
+
+    tbody.appendChild(row);
+  }
+}
+
+function openProductModal(productId) {
+  document.getElementById('editProductId').value = productId || '';
+  document.getElementById('productModalTitle').textContent = productId ? 'แก้ไขสินค้า' : 'เพิ่มสินค้า';
+
+  if (productId) {
+    var product = allProducts.find(function(p) { return p['รหัสสินค้า'] === productId; });
+    if (product) {
+      document.getElementById('productName').value = product['ชื่อสินค้า'];
+      document.getElementById('productCategory').value = product['หมวดหมู่'];
+      document.getElementById('productPrice').value = product['ราคาขาย'];
+      document.getElementById('productTime').value = product['เวลาทำ(นาที)'] || 3;
+    }
+  } else {
+    document.getElementById('productForm').reset();
+    document.getElementById('productMaterialsContainer').innerHTML = '';
+  }
+
+  updateCategorySelects();
+  openModal('productModal');
+}
+
+function editProduct(productId) {
+  openProductModal(productId);
+}
+
+function addMaterialRow() {
+  var container = document.getElementById('productMaterialsContainer');
+  var row = document.createElement('div');
+  row.className = 'flex gap-2 mb-2';
+
+  var materialSelect = '<select class="flex-1 px-2 py-1 border rounded material-select"><option value="">เลือกวัตถุดิบ</option>';
+  for (var i = 0; i < allMaterials.length; i++) {
+    if (allMaterials[i]['สถานะ'] === 'ใช้งาน') {
+      materialSelect += '<option value="' + allMaterials[i]['รหัสวัตถุดิบ'] + '" data-price="' + allMaterials[i]['ราคาต่อหน่วย'] + '">' +
+        allMaterials[i]['ชื่อวัตถุดิบ'] + ' (' + allMaterials[i]['หน่วย'] + ')</option>';
+    }
+  }
+  materialSelect += '</select>';
+
+  row.innerHTML = materialSelect +
+    '<input type="number" placeholder="จำนวน" class="w-24 px-2 py-1 border rounded material-qty" step="0.01" min="0" onchange="calculateProductCost()">' +
+    '<button type="button" onclick="this.parentElement.remove(); calculateProductCost()" class="bg-red-500 text-white px-2 py-1 rounded">' +
+    '<i class="fas fa-times"></i></button>';
+
+  container.appendChild(row);
+}
+
+function calculateProductCost() {
+  var totalCost = 0;
+  var selects = document.querySelectorAll('.material-select');
+  var qtys = document.querySelectorAll('.material-qty');
+
+  for (var i = 0; i < selects.length; i++) {
+    var selectedOption = selects[i].options[selects[i].selectedIndex];
+    var price = parseFloat(selectedOption.getAttribute('data-price')) || 0;
+    var qty = parseFloat(qtys[i].value) || 0;
+    totalCost += price * qty;
+  }
+
+  document.getElementById('calculatedCost').textContent = totalCost.toFixed(2);
+}
+
+function saveProduct(event) {
+  event.preventDefault();
+  showLoading();
+
+  var productId = document.getElementById('editProductId').value;
+  var materials = [];
+  var selects = document.querySelectorAll('.material-select');
+  var qtys = document.querySelectorAll('.material-qty');
+
+  for (var i = 0; i < selects.length; i++) {
+    if (selects[i].value) {
+      materials.push({
+        id: selects[i].value,
+        quantity: parseFloat(qtys[i].value) || 0
+      });
+    }
+  }
+
+  var productData = {
+    'ชื่อสินค้า': document.getElementById('productName').value,
+    'หมวดหมู่': document.getElementById('productCategory').value,
+    'ราคาขาย': parseFloat(document.getElementById('productPrice').value),
+    'ราคาทุน': parseFloat(document.getElementById('calculatedCost').textContent),
+    'เวลาทำ(นาที)': parseInt(document.getElementById('productTime').value),
+    'วัตถุดิบ': materials,
+    'ตัวเลือก': [],
+    'สถานะ': 'ใช้งาน'
+  };
+
+  if (productId) {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        hideLoading();
+        if (result.success) {
+          closeModal('productModal');
+          showToast('แก้ไขสินค้าสำเร็จ', 'success');
+          loadProducts();
+          loadProductsTable();
+        } else {
+          showToast('ไม่สามารถแก้ไขสินค้าได้', 'error');
+        }
+      })
+      .withFailureHandler(function(error) {
+        hideLoading();
+        showToast('เกิดข้อผิดพลาด', 'error');
+      })
+      .updateProduct(currentSheetId, productId, productData);
+  } else {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        hideLoading();
+        if (result.success) {
+          closeModal('productModal');
+          showToast('เพิ่มสินค้าสำเร็จ', 'success');
+          loadProducts();
+          loadProductsTable();
+        } else {
+          showToast('ไม่สามารถเพิ่มสินค้าได้', 'error');
+        }
+      })
+      .withFailureHandler(function(error) {
+        hideLoading();
+        showToast('เกิดข้อผิดพลาด', 'error');
+      })
+      .addProduct(currentSheetId, productData);
+  }
+}
+
+function deleteProductConfirm(productId) {
+  Swal.fire({
+    title: 'ลบสินค้า?',
+    text: 'คุณต้องการลบสินค้านี้หรือไม่?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'ใช่, ลบเลย',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#ef4444'
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      deleteProductItem(productId);
+    }
+  });
+}
+
+function deleteProductItem(productId) {
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        showToast('ลบสินค้าสำเร็จ', 'success');
+        loadProducts();
+        loadProductsTable();
+      } else {
+        showToast('ไม่สามารถลบสินค้าได้', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('เกิดข้อผิดพลาด', 'error');
+    })
+    .deleteProduct(currentSheetId, productId);
+}
+
+function openManageCategoriesModal() {
+  showToast('ฟีเจอร์จัดการหมวดหมู่ - Coming soon', 'info');
+}
+
+function openManageOptionsModal() {
+  showToast('ฟีเจอร์จัดการตัวเลือก - Coming soon', 'info');
+}
+
+// ===== MATERIALS MANAGEMENT =====
+function loadMaterialsTable() {
+  var tbody = document.getElementById('materialsTable');
+  tbody.innerHTML = '';
+
+  if (allMaterials.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-gray-500">ไม่มีวัตถุดิบ</td></tr>';
+    return;
+  }
+
+  for (var i = 0; i < allMaterials.length; i++) {
+    var material = allMaterials[i];
+    if (material['สถานะ'] !== 'ใช้งาน') continue;
+
+    var row = document.createElement('tr');
+    row.className = 'border-b hover:bg-gray-50';
+
+    var qty = parseFloat(material['จำนวนคงเหลือ']);
+    var minQty = parseFloat(material['จำนวนขั้นต่ำ']);
+    var statusBadge = qty > minQty ? '<span class="badge badge-success">ปกติ</span>' :
+      qty > 0 ? '<span class="badge badge-warning">ใกล้หมด</span>' :
+        '<span class="badge badge-danger">หมด</span>';
+
+    row.innerHTML = '<td class="px-4 py-2">' + material['รหัสวัตถุดิบ'] + '</td>' +
+      '<td class="px-4 py-2">' + material['ชื่อวัตถุดิบ'] + '</td>' +
+      '<td class="px-4 py-2 text-center">' + material['หน่วย'] + '</td>' +
+      '<td class="px-4 py-2 text-right">฿' + parseFloat(material['ราคาต่อหน่วย']).toFixed(2) + '</td>' +
+      '<td class="px-4 py-2 text-right">' + qty + '</td>' +
+      '<td class="px-4 py-2 text-right">' + minQty + '</td>' +
+      '<td class="px-4 py-2 text-center">' + statusBadge + '</td>' +
+      '<td class="px-4 py-2 text-center">' +
+      '<button onclick="editMaterial(\'' + material['รหัสวัตถุดิบ'] + '\')" class="text-blue-600 hover:text-blue-800 mr-2">' +
+      '<i class="fas fa-edit"></i></button>' +
+      '<button onclick="deleteMaterialConfirm(\'' + material['รหัสวัตถุดิบ'] + '\')" class="text-red-600 hover:text-red-800">' +
+      '<i class="fas fa-trash"></i></button>' +
+      '</td>';
+
+    tbody.appendChild(row);
+  }
+}
+
+function openMaterialModal(materialId) {
+  document.getElementById('editMaterialId').value = materialId || '';
+  document.getElementById('materialModalTitle').textContent = materialId ? 'แก้ไขวัตถุดิบ' : 'เพิ่มวัตถุดิบ';
+
+  if (materialId) {
+    var material = allMaterials.find(function(m) { return m['รหัสวัตถุดิบ'] === materialId; });
+    if (material) {
+      document.getElementById('materialName').value = material['ชื่อวัตถุดิบ'];
+      document.getElementById('materialUnit').value = material['หน่วย'];
+      document.getElementById('materialPrice').value = material['ราคาต่อหน่วย'];
+      document.getElementById('materialMinQty').value = material['จำนวนขั้นต่ำ'];
+    }
+  } else {
+    document.getElementById('materialForm').reset();
+  }
+
+  openModal('materialModal');
+}
+
+function editMaterial(materialId) {
+  openMaterialModal(materialId);
+}
+
+function saveMaterial(event) {
+  event.preventDefault();
+  showLoading();
+
+  var materialId = document.getElementById('editMaterialId').value;
+  var materialData = {
+    name: document.getElementById('materialName').value,
+    unit: document.getElementById('materialUnit').value,
+    pricePerUnit: parseFloat(document.getElementById('materialPrice').value),
+    minQuantity: parseFloat(document.getElementById('materialMinQty').value)
+  };
+
+  if (materialId) {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        hideLoading();
+        if (result.success) {
+          closeModal('materialModal');
+          showToast('แก้ไขวัตถุดิบสำเร็จ', 'success');
+          loadMaterials();
+          loadMaterialsTable();
+        } else {
+          showToast('ไม่สามารถแก้ไขวัตถุดิบได้', 'error');
+        }
+      })
+      .withFailureHandler(function(error) {
+        hideLoading();
+        showToast('เกิดข้อผิดพลาด', 'error');
+      })
+      .updateMaterial(currentSheetId, materialId, materialData);
+  } else {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        hideLoading();
+        if (result.success) {
+          closeModal('materialModal');
+          showToast('เพิ่มวัตถุดิบสำเร็จ', 'success');
+          loadMaterials();
+          loadMaterialsTable();
+        } else {
+          showToast('ไม่สามารถเพิ่มวัตถุดิบได้', 'error');
+        }
+      })
+      .withFailureHandler(function(error) {
+        hideLoading();
+        showToast('เกิดข้อผิดพลาด', 'error');
+      })
+      .addMaterial(currentSheetId, materialData);
+  }
+}
+
+function deleteMaterialConfirm(materialId) {
+  Swal.fire({
+    title: 'ลบวัตถุดิบ?',
+    text: 'คุณต้องการลบวัตถุดิบนี้หรือไม่?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'ใช่, ลบเลย',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#ef4444'
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      deleteMaterialItem(materialId);
+    }
+  });
+}
+
+function deleteMaterialItem(materialId) {
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        showToast('ลบวัตถุดิบสำเร็จ', 'success');
+        loadMaterials();
+        loadMaterialsTable();
+      } else {
+        showToast('ไม่สามารถลบวัตถุดิบได้', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('เกิดข้อผิดพลาด', 'error');
+    })
+    .deleteMaterial(currentSheetId, materialId);
+}
+
+function openPurchaseMaterialModal() {
+  showToast('ฟีเจอร์สั่งซื้อวัตถุดิบ - Coming soon', 'info');
+}
+
+function openWasteModal() {
+  showToast('ฟีเจอร์บันทึกของเสีย - Coming soon', 'info');
+}
+
+// ===== COSTS MANAGEMENT =====
+function switchCostTab(tab) {
+  var tabs = document.querySelectorAll('.tab-button');
+  var contents = document.querySelectorAll('.tab-content');
+
+  tabs.forEach(function(t) { t.classList.remove('active'); });
+  contents.forEach(function(c) { c.classList.remove('active'); });
+
+  if (tab === 'daily') {
+    tabs[0].classList.add('active');
+    document.getElementById('costTabDaily').classList.add('active');
+  } else {
+    tabs[1].classList.add('active');
+    document.getElementById('costTabMonthly').classList.add('active');
+  }
+}
+
+function loadCosts() {
+  loadDailyCosts();
+  loadMonthlyCosts();
+}
+
+function loadDailyCosts() {
+  var today = new Date();
+  var month = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+
+  google.script.run
+    .withSuccessHandler(function(costs) {
+      renderDailyCostsTable(costs);
+    })
+    .getDailyCosts(currentSheetId, month);
+}
+
+function loadMonthlyCosts() {
+  var today = new Date();
+  var year = today.getFullYear().toString();
+
+  google.script.run
+    .withSuccessHandler(function(costs) {
+      renderMonthlyCostsTable(costs);
+    })
+    .getMonthlyCosts(currentSheetId, year);
+}
+
+function renderDailyCostsTable(costs) {
+  var tbody = document.getElementById('dailyCostsTable');
+  tbody.innerHTML = '';
+
+  if (costs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">ไม่มีข้อมูล</td></tr>';
+    return;
+  }
+
+  for (var i = 0; i < costs.length; i++) {
+    var cost = costs[i];
+    var row = document.createElement('tr');
+    row.className = 'border-b hover:bg-gray-50';
+
+    var date = new Date(cost['วันที่']);
+
+    row.innerHTML = '<td class="px-4 py-2">' + date.toLocaleDateString('th-TH') + '</td>' +
+      '<td class="px-4 py-2">' + cost['รายการ'] + '</td>' +
+      '<td class="px-4 py-2">' + cost['หมวดหมู่'] + '</td>' +
+      '<td class="px-4 py-2 text-right">฿' + parseFloat(cost['จำนวนเงิน']).toFixed(2) + '</td>' +
+      '<td class="px-4 py-2">' + (cost['หมายเหตุ'] || '-') + '</td>';
+
+    tbody.appendChild(row);
+  }
+}
+
+function renderMonthlyCostsTable(costs) {
+  var tbody = document.getElementById('monthlyCostsTable');
+  tbody.innerHTML = '';
+
+  if (costs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">ไม่มีข้อมูล</td></tr>';
+    return;
+  }
+
+  for (var i = 0; i < costs.length; i++) {
+    var cost = costs[i];
+    var row = document.createElement('tr');
+    row.className = 'border-b hover:bg-gray-50';
+
+    row.innerHTML = '<td class="px-4 py-2">' + cost['เดือน/ปี'] + '</td>' +
+      '<td class="px-4 py-2">' + cost['รายการ'] + '</td>' +
+      '<td class="px-4 py-2">' + cost['หมวดหมู่'] + '</td>' +
+      '<td class="px-4 py-2 text-right">฿' + parseFloat(cost['จำนวนเงิน']).toFixed(2) + '</td>' +
+      '<td class="px-4 py-2">' + (cost['หมายเหตุ'] || '-') + '</td>';
+
+    tbody.appendChild(row);
+  }
+}
+
+function openDailyCostModal() {
+  showToast('ฟีเจอร์เพิ่มต้นทุนรายวัน - Coming soon', 'info');
+}
+
+function openMonthlyCostModal() {
+  showToast('ฟีเจอร์เพิ่มต้นทุนรายเดือน - Coming soon', 'info');
+}
+
+// ===== REPORTS =====
+function loadPLReport() {
+  var month = document.getElementById('plMonth').value;
+  if (!month) return;
+
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(data) {
+      hideLoading();
+      document.getElementById('plRevenue').textContent = '฿' + data.revenue.toFixed(2);
+      document.getElementById('plProductCost').textContent = '฿' + data.productCost.toFixed(2);
+      document.getElementById('plDailyCost').textContent = '฿' + data.dailyCost.toFixed(2);
+      document.getElementById('plMonthlyCost').textContent = '฿' + data.monthlyCost.toFixed(2);
+      document.getElementById('plTotalCost').textContent = '฿' + data.totalCost.toFixed(2);
+      document.getElementById('plProfit').textContent = '฿' + data.profit.toFixed(2);
+      document.getElementById('plProfitMargin').textContent = data.profitMargin.toFixed(2) + '%';
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('ไม่สามารถโหลดรายงานได้', 'error');
+    })
+    .getProfitLossReport(currentSheetId, month);
+}
+
+function loadTopProductsReport() {
+  var today = new Date();
+  var month = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+  var startDate = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-01';
+  var lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  var endDate = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + lastDay;
+
+  google.script.run
+    .withSuccessHandler(function(report) {
+      var tbody = document.getElementById('topProductsReportTable');
+      tbody.innerHTML = '';
+
+      if (!report.topProducts || report.topProducts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">ไม่มีข้อมูล</td></tr>';
+        return;
+      }
+
+      for (var i = 0; i < Math.min(report.topProducts.length, 10); i++) {
+        var product = report.topProducts[i];
+        var row = document.createElement('tr');
+        row.className = 'border-b hover:bg-gray-50';
+
+        var badge = i === 0 ? '<span class="badge badge-warning">🥇</span>' :
+          i === 1 ? '<span class="badge badge-secondary">🥈</span>' :
+            i === 2 ? '<span class="badge" style="background:#cd7f32;color:white;">🥉</span>' : '';
+
+        row.innerHTML = '<td class="px-4 py-2">' + badge + ' ' + (i + 1) + '</td>' +
+          '<td class="px-4 py-2">' + product.name + '</td>' +
+          '<td class="px-4 py-2 text-right">' + product.quantity + '</td>' +
+          '<td class="px-4 py-2 text-right">฿' + product.revenue.toFixed(2) + '</td>';
+
+        tbody.appendChild(row);
+      }
+    })
+    .getSalesReport(currentSheetId, startDate, endDate);
+}
+
+// ===== SETTINGS =====
+function loadSettingsPage() {
+  google.script.run
+    .withSuccessHandler(function(settingsData) {
+      settings = settingsData;
+
+      document.getElementById('settingShopName').value = settings['ชื่อร้าน'] || '';
+      document.getElementById('settingAddress').value = settings['ที่อยู่'] || '';
+      document.getElementById('settingPhone').value = settings['เบอร์โทร'] || '';
+      document.getElementById('settingPromptpay').value = settings['หมายเลขพร้อมเพย์'] || '';
+
+      var taxEnabled = settings['เปิดภาษี'] === 'true';
+      document.getElementById('settingTaxEnabled').checked = taxEnabled;
+      document.getElementById('taxSettings').style.display = taxEnabled ? 'block' : 'none';
+      document.getElementById('settingTaxType').value = settings['ประเภทภาษี'] || 'รวมในราคา';
+
+      document.getElementById('settingReceiptSize').value = settings['ขนาดใบเสร็จ'] || '58mm';
+      document.getElementById('settingReceiptMessage').value = settings['ข้อความใบเสร็จ'] || '';
+
+      loadChannelsList();
+    })
+    .getSettings(currentSheetId);
+}
+
+function saveShopInfo(event) {
+  event.preventDefault();
+  showLoading();
+
+  var newSettings = {
+    'ชื่อร้าน': document.getElementById('settingShopName').value,
+    'ที่อยู่': document.getElementById('settingAddress').value,
+    'เบอร์โทร': document.getElementById('settingPhone').value,
+    'หมายเลขพร้อมเพย์': document.getElementById('settingPromptpay').value
+  };
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        showToast('บันทึกข้อมูลสำเร็จ', 'success');
+        loadSettings();
+      } else {
+        showToast('ไม่สามารถบันทึกได้', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('เกิดข้อผิดพลาด', 'error');
+    })
+    .updateSettings(currentSheetId, newSettings);
+}
+
+function toggleTaxSettings() {
+  var enabled = document.getElementById('settingTaxEnabled').checked;
+  document.getElementById('taxSettings').style.display = enabled ? 'block' : 'none';
+}
+
+function saveSystemSettings() {
+  showLoading();
+
+  var newSettings = {
+    'เปิดภาษี': document.getElementById('settingTaxEnabled').checked ? 'true' : 'false',
+    'ประเภทภาษี': document.getElementById('settingTaxType').value,
+    'ขนาดใบเสร็จ': document.getElementById('settingReceiptSize').value,
+    'ข้อความใบเสร็จ': document.getElementById('settingReceiptMessage').value
+  };
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        showToast('บันทึกการตั้งค่าสำเร็จ', 'success');
+        loadSettings();
+      } else {
+        showToast('ไม่สามารถบันทึกได้', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('เกิดข้อผิดพลาด', 'error');
+    })
+    .updateSettings(currentSheetId, newSettings);
+}
+
+function loadChannelsList() {
+  var container = document.getElementById('channelsList');
+  container.innerHTML = '';
+
+  for (var i = 0; i < allChannels.length; i++) {
+    var channel = allChannels[i];
+    if (channel['สถานะ'] !== 'ใช้งาน') continue;
+
+    var div = document.createElement('div');
+    div.className = 'flex justify-between items-center p-3 bg-gray-50 rounded mb-2';
+    div.innerHTML = '<div>' +
+      '<p class="font-semibold">' + channel['ชื่อช่องทาง'] + '</p>' +
+      '<p class="text-sm text-gray-500">' + (channel['ประเภทเลขออเดอร์'] === 'อัตโนมัติ' ? 'เลขออเดอร์อัตโนมัติ' : 'ระบุเลขออเดอร์เอง') + '</p>' +
+      '</div>' +
+      '<button onclick="deleteChannelConfirm(\'' + channel['รหัสช่องทาง'] + '\')" class="text-red-600 hover:text-red-800">' +
+      '<i class="fas fa-trash"></i></button>';
+
+    container.appendChild(div);
+  }
+}
+
+function openChannelModal() {
+  showToast('ฟีเจอร์เพิ่มช่องทางการสั่งซื้อ - Coming soon', 'info');
+}
+
+function deleteChannelConfirm(channelId) {
+  Swal.fire({
+    title: 'ลบช่องทาง?',
+    text: 'คุณต้องการลบช่องทางนี้หรือไม่?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'ใช่, ลบเลย',
+    cancelButtonText: 'ยกเลิก'
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      deleteChannelItem(channelId);
+    }
+  });
+}
+
+function deleteChannelItem(channelId) {
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        showToast('ลบช่องทางสำเร็จ', 'success');
+        loadOrderChannels();
+        loadChannelsList();
+      } else {
+        showToast('ไม่สามารถลบได้', 'error');
+      }
+    })
+    .deleteOrderChannel(currentSheetId, channelId);
+}
+
+function openChangePasswordModal() {
+  showToast('ฟีเจอร์เปลี่ยนรหัสผ่าน - Coming soon', 'info');
+}
+
+function showLicenseStatus() {
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(license) {
+      hideLoading();
+      if (license) {
+        var expiryDate = new Date(license.expiryDate);
+        Swal.fire({
+          title: 'สถานะไลเซ่นส์',
+          html: '<div class="text-left">' +
+            '<p><strong>ชื่อร้าน:</strong> ' + license.shopName + '</p>' +
+            '<p><strong>อีเมล:</strong> ' + license.email + '</p>' +
+            '<p><strong>แพ็คเกจ:</strong> ' + license.package + '</p>' +
+            '<p><strong>สถานะ:</strong> <span class="badge badge-success">' + license.status + '</span></p>' +
+            '<p><strong>วันหมดอายุ:</strong> ' + expiryDate.toLocaleDateString('th-TH') + '</p>' +
+            '<p><strong>เหลือเวลา:</strong> ' + license.daysLeft + ' วัน</p>' +
+            '</div>',
+          icon: license.daysLeft <= 30 ? 'warning' : 'info',
+          confirmButtonText: 'ปิด'
+        });
+      } else {
+        showToast('ไม่พบข้อมูลไลเซ่นส์', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('เกิดข้อผิดพลาด', 'error');
+    })
+    .getLicenseStatus(currentShopId);
+}
 
 </script>
 
