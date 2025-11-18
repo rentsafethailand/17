@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Admin - Coffee POS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    body { font-family: 'Sarabun', sans-serif; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+    .modal.active { display: flex; align-items: center; justify-content: center; }
+    .modal-content { background-color: #fefefe; margin: auto; padding: 0; border-radius: 12px; max-width: 90%; max-height: 90vh; overflow-y: auto; }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .badge-success { background-color: #10b981; color: white; }
+    .badge-warning { background-color: #f59e0b; color: white; }
+    .badge-danger { background-color: #ef4444; color: white; }
+    .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .tab-button { padding: 12px 24px; background: #e5e7eb; border: none; cursor: pointer; border-radius: 8px 8px 0 0; margin-right: 4px; }
+    .tab-button.active { background: #3b82f6; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body class="bg-gray-50">
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+  <div class="bg-white p-6 rounded-lg shadow-xl">
+    <div class="spinner"></div>
+    <p class="text-center mt-4">กำลังโหลด...</p>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-6 shadow-lg">
+  <div class="container mx-auto px-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold">
+          <i class="fas fa-crown mr-2"></i>Super Admin Panel
+        </h1>
+        <p class="text-purple-100 mt-1">Coffee Shop POS Management</p>
+      </div>
+      <a href="<?= ScriptApp.getService().getUrl() ?>" class="bg-white text-purple-600 px-6 py-2 rounded-lg font-semibold hover:bg-purple-50 transition">
+        <i class="fas fa-home mr-2"></i>กลับหน้าหลัก
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="container mx-auto px-4 py-8">
+
+  <!-- Stats Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white rounded-lg shadow p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-500 text-sm">ร้านทั้งหมด</p>
+          <p id="totalShops" class="text-3xl font-bold text-blue-600">0</p>
+        </div>
+        <div class="bg-blue-100 p-3 rounded-full">
+          <i class="fas fa-store text-blue-600 text-2xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-500 text-sm">ใช้งาน</p>
+          <p id="activeShops" class="text-3xl font-bold text-green-600">0</p>
+        </div>
+        <div class="bg-green-100 p-3 rounded-full">
+          <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-500 text-sm">รอตรวจสอบ</p>
+          <p id="pendingRegistrations" class="text-3xl font-bold text-orange-600">0</p>
+        </div>
+        <div class="bg-orange-100 p-3 rounded-full">
+          <i class="fas fa-clock text-orange-600 text-2xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-500 text-sm">ระงับ</p>
+          <p id="suspendedShops" class="text-3xl font-bold text-red-600">0</p>
+        </div>
+        <div class="bg-red-100 p-3 rounded-full">
+          <i class="fas fa-ban text-red-600 text-2xl"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="bg-white rounded-lg shadow-lg">
+    <div class="border-b p-4">
+      <button class="tab-button active" onclick="switchTab('registrations')">
+        <i class="fas fa-user-plus mr-2"></i>การลงทะเบียนใหม่
+      </button>
+      <button class="tab-button" onclick="switchTab('shops')">
+        <i class="fas fa-store mr-2"></i>จัดการร้าน
+      </button>
+      <button class="tab-button" onclick="switchTab('licenses')">
+        <i class="fas fa-certificate mr-2"></i>ไลเซ่นส์
+      </button>
+    </div>
+
+    <!-- Registrations Tab -->
+    <div id="tabRegistrations" class="tab-content active p-6">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">การลงทะเบียนรอตรวจสอบ</h2>
+        <button onclick="loadRegistrations()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+          <i class="fas fa-sync mr-2"></i>รีเฟรช
+        </button>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="bg-gray-100">
+              <th class="px-4 py-3 text-left">รหัส</th>
+              <th class="px-4 py-3 text-left">ชื่อร้าน</th>
+              <th class="px-4 py-3 text-left">อีเมล</th>
+              <th class="px-4 py-3 text-left">แพ็คเกจ</th>
+              <th class="px-4 py-3 text-right">จำนวนเงิน</th>
+              <th class="px-4 py-3 text-left">วันที่</th>
+              <th class="px-4 py-3 text-center">สถานะ</th>
+              <th class="px-4 py-3 text-center">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="registrationsTable">
+            <tr>
+              <td colspan="8" class="text-center py-8 text-gray-500">กำลังโหลด...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Shops Tab -->
+    <div id="tabShops" class="tab-content p-6">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">ร้านทั้งหมด</h2>
+        <div class="flex gap-2">
+          <button onclick="openAddShopModal()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
+            <i class="fas fa-plus mr-2"></i>เพิ่มร้าน
+          </button>
+          <button onclick="loadShops()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+            <i class="fas fa-sync mr-2"></i>รีเฟรช
+          </button>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="bg-gray-100">
+              <th class="px-4 py-3 text-left">รหัสร้าน</th>
+              <th class="px-4 py-3 text-left">ชื่อร้าน</th>
+              <th class="px-4 py-3 text-left">อีเมล</th>
+              <th class="px-4 py-3 text-left">แพ็คเกจ</th>
+              <th class="px-4 py-3 text-left">วันหมดอายุ</th>
+              <th class="px-4 py-3 text-center">คงเหลือ</th>
+              <th class="px-4 py-3 text-center">สถานะ</th>
+              <th class="px-4 py-3 text-center">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="shopsTable">
+            <tr>
+              <td colspan="8" class="text-center py-8 text-gray-500">กำลังโหลด...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Licenses Tab -->
+    <div id="tabLicenses" class="tab-content p-6">
+      <h2 class="text-2xl font-bold mb-6">ภาพรวมไลเซ่นส์</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-6">
+          <h3 class="text-lg font-semibold mb-2">รายได้รายเดือน</h3>
+          <p class="text-4xl font-bold" id="monthlyRevenue">฿0</p>
+          <p class="text-sm opacity-75 mt-2">จากแพ็คเกจรายเดือน</p>
+        </div>
+
+        <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg p-6">
+          <h3 class="text-lg font-semibold mb-2">รายได้รายปี</h3>
+          <p class="text-4xl font-bold" id="yearlyRevenue">฿0</p>
+          <p class="text-sm opacity-75 mt-2">จากแพ็คเกจรายปี</p>
+        </div>
+      </div>
+
+      <div class="bg-white border rounded-lg p-6">
+        <h3 class="text-xl font-bold mb-4">ไลเซ่นส์ใกล้หมดอายุ (30 วัน)</h3>
+        <div id="expiringLicenses" class="space-y-3"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Slip Modal -->
+<div id="slipModal" class="modal">
+  <div class="modal-content w-full max-w-2xl">
+    <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-t-lg flex justify-between items-center">
+      <h3 class="text-xl font-bold text-white">
+        <i class="fas fa-image mr-2"></i>หลักฐานการชำระเงิน
+      </h3>
+      <button onclick="closeModal('slipModal')" class="text-white hover:text-gray-200">
+        <i class="fas fa-times text-2xl"></i>
+      </button>
+    </div>
+    <div class="p-6">
+      <div id="slipContent" class="text-center"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Shop Details Modal -->
+<div id="shopDetailsModal" class="modal">
+  <div class="modal-content w-full max-w-2xl">
+    <div class="bg-gradient-to-r from-green-500 to-blue-600 p-4 rounded-t-lg flex justify-between items-center">
+      <h3 class="text-xl font-bold text-white">
+        <i class="fas fa-store mr-2"></i>รายละเอียดร้าน
+      </h3>
+      <button onclick="closeModal('shopDetailsModal')" class="text-white hover:text-gray-200">
+        <i class="fas fa-times text-2xl"></i>
+      </button>
+    </div>
+    <div class="p-6">
+      <div id="shopDetailsContent"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var allRegistrations = [];
+var allShops = [];
+
+window.onload = function() {
+  loadStats();
+  loadRegistrations();
+  loadShops();
+};
+
+function showLoading() {
+  document.getElementById('loadingOverlay').style.display = 'flex';
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+function switchTab(tab) {
+  var buttons = document.querySelectorAll('.tab-button');
+  var contents = document.querySelectorAll('.tab-content');
+
+  buttons.forEach(function(btn) { btn.classList.remove('active'); });
+  contents.forEach(function(content) { content.classList.remove('active'); });
+
+  if (tab === 'registrations') {
+    buttons[0].classList.add('active');
+    document.getElementById('tabRegistrations').classList.add('active');
+  } else if (tab === 'shops') {
+    buttons[1].classList.add('active');
+    document.getElementById('tabShops').classList.add('active');
+  } else if (tab === 'licenses') {
+    buttons[2].classList.add('active');
+    document.getElementById('tabLicenses').classList.add('active');
+    loadLicenseStats();
+  }
+}
+
+function loadStats() {
+  google.script.run
+    .withSuccessHandler(function(shops) {
+      allShops = shops;
+      var active = 0, suspended = 0;
+
+      for (var i = 0; i < shops.length; i++) {
+        if (shops[i]['สถานะ'] === 'ใช้งาน') active++;
+        if (shops[i]['สถานะ'] === 'ระงับ') suspended++;
+      }
+
+      document.getElementById('totalShops').textContent = shops.length;
+      document.getElementById('activeShops').textContent = active;
+      document.getElementById('suspendedShops').textContent = suspended;
+    })
+    .getAllShops();
+
+  google.script.run
+    .withSuccessHandler(function(registrations) {
+      document.getElementById('pendingRegistrations').textContent = registrations.length;
+    })
+    .getPendingRegistrations();
+}
+
+function loadRegistrations() {
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(registrations) {
+      hideLoading();
+      allRegistrations = registrations;
+      renderRegistrationsTable(registrations);
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      Swal.fire('Error', 'ไม่สามารถโหลดข้อมูลได้', 'error');
+    })
+    .getPendingRegistrations();
+}
+
+function renderRegistrationsTable(registrations) {
+  var tbody = document.getElementById('registrationsTable');
+  tbody.innerHTML = '';
+
+  if (registrations.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">ไม่มีการลงทะเบียนรอตรวจสอบ</td></tr>';
+    return;
+  }
+
+  for (var i = 0; i < registrations.length; i++) {
+    var reg = registrations[i];
+    var row = document.createElement('tr');
+    row.className = 'border-b hover:bg-gray-50';
+
+    var date = new Date(reg['วันที่ลงทะเบียน']);
+    var statusBadge = '<span class="badge badge-warning">รอตรวจสอบ</span>';
+
+    row.innerHTML = '<td class="px-4 py-3">' + reg['รหัสลงทะเบียน'] + '</td>' +
+      '<td class="px-4 py-3">' + reg['ชื่อร้าน'] + '</td>' +
+      '<td class="px-4 py-3">' + reg['อีเมล'] + '</td>' +
+      '<td class="px-4 py-3">' + reg['แพ็คเกจ'] + '</td>' +
+      '<td class="px-4 py-3 text-right">฿' + reg['จำนวนเงิน'].toLocaleString() + '</td>' +
+      '<td class="px-4 py-3">' + date.toLocaleDateString('th-TH') + '</td>' +
+      '<td class="px-4 py-3 text-center">' + statusBadge + '</td>' +
+      '<td class="px-4 py-3 text-center">' +
+      '<button onclick="viewSlip(\'' + reg['รหัสลงทะเบียน'] + '\')" class="text-blue-600 hover:text-blue-800 mr-2" title="ดูสลิป">' +
+      '<i class="fas fa-image"></i></button>' +
+      '<button onclick="approveRegistration(\'' + reg['รหัสลงทะเบียน'] + '\')" class="text-green-600 hover:text-green-800" title="อนุมัติ">' +
+      '<i class="fas fa-check-circle"></i></button>' +
+      '</td>';
+
+    tbody.appendChild(row);
+  }
+}
+
+function viewSlip(regId) {
+  var reg = allRegistrations.find(function(r) { return r['รหัสลงทะเบียน'] === regId; });
+  if (reg && reg['รูปสลิป']) {
+    document.getElementById('slipContent').innerHTML =
+      '<a href="' + reg['รูปสลิป'] + '" target="_blank">' +
+      '<img src="' + reg['รูปสลิป'] + '" style="max-width: 100%; border-radius: 8px;">' +
+      '</a>';
+    openModal('slipModal');
+  } else {
+    Swal.fire('ไม่พบสลิป', 'ไม่มีรูปสลิปในระบบ', 'warning');
+  }
+}
+
+function approveRegistration(regId) {
+  Swal.fire({
+    title: 'อนุมัติการลงทะเบียน?',
+    text: 'ระบบจะสร้างร้านใหม่และส่งอีเมลแจ้งเตือนให้เจ้าของร้าน',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'อนุมัติ',
+    cancelButtonText: 'ยกเลิก',
+    confirmButtonColor: '#10b981'
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoading();
+          if (result.success) {
+            Swal.fire('สำเร็จ!', 'เปิดใช้งานร้านแล้ว', 'success');
+            loadRegistrations();
+            loadStats();
+          } else {
+            Swal.fire('Error', result.message || 'ไม่สามารถอนุมัติได้', 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          Swal.fire('Error', error.message, 'error');
+        })
+        .approveRegistration(regId);
+    }
+  });
+}
+
+function loadShops() {
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(shops) {
+      hideLoading();
+      allShops = shops;
+      renderShopsTable(shops);
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      Swal.fire('Error', 'ไม่สามารถโหลดข้อมูลได้', 'error');
+    })
+    .getAllShops();
+}
+
+function renderShopsTable(shops) {
+  var tbody = document.getElementById('shopsTable');
+  tbody.innerHTML = '';
+
+  if (shops.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">ไม่มีร้าน</td></tr>';
+    return;
+  }
+
+  for (var i = 0; i < shops.length; i++) {
+    var shop = shops[i];
+    var row = document.createElement('tr');
+    row.className = 'border-b hover:bg-gray-50';
+
+    var expiryDate = new Date(shop['วันหมดอายุ']);
+    var today = new Date();
+    var daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+
+    var daysLeftBadge = daysLeft <= 0 ? '<span class="badge badge-danger">หมดอายุ</span>' :
+      daysLeft <= 30 ? '<span class="badge badge-warning">' + daysLeft + ' วัน</span>' :
+        '<span class="badge badge-success">' + daysLeft + ' วัน</span>';
+
+    var statusBadge = shop['สถานะ'] === 'ใช้งาน' ? '<span class="badge badge-success">ใช้งาน</span>' :
+      '<span class="badge badge-danger">ระงับ</span>';
+
+    row.innerHTML = '<td class="px-4 py-3">' + shop['รหัสร้าน'] + '</td>' +
+      '<td class="px-4 py-3">' + shop['ชื่อร้าน'] + '</td>' +
+      '<td class="px-4 py-3">' + shop['อีเมล'] + '</td>' +
+      '<td class="px-4 py-3">' + shop['แพ็คเกจ'] + '</td>' +
+      '<td class="px-4 py-3">' + expiryDate.toLocaleDateString('th-TH') + '</td>' +
+      '<td class="px-4 py-3 text-center">' + daysLeftBadge + '</td>' +
+      '<td class="px-4 py-3 text-center">' + statusBadge + '</td>' +
+      '<td class="px-4 py-3 text-center">' +
+      '<button onclick="viewShopDetails(\'' + shop['รหัสร้าน'] + '\')" class="text-blue-600 hover:text-blue-800 mr-2" title="ดูรายละเอียด">' +
+      '<i class="fas fa-eye"></i></button>' +
+      '<button onclick="extendLicense(\'' + shop['รหัสร้าน'] + '\')" class="text-green-600 hover:text-green-800 mr-2" title="ต่ออายุ">' +
+      '<i class="fas fa-plus-circle"></i></button>' +
+      '<button onclick="toggleShopStatus(\'' + shop['รหัสร้าน'] + '\', \'' + shop['สถานะ'] + '\')" class="text-orange-600 hover:text-orange-800" title="เปลี่ยนสถานะ">' +
+      '<i class="fas fa-power-off"></i></button>' +
+      '</td>';
+
+    tbody.appendChild(row);
+  }
+}
+
+function viewShopDetails(shopId) {
+  var shop = allShops.find(function(s) { return s['รหัสร้าน'] === shopId; });
+  if (!shop) return;
+
+  var expiryDate = new Date(shop['วันหมดอายุ']);
+  var createDate = new Date(shop['วันที่สร้าง']);
+
+  var html = '<div class="space-y-4">' +
+    '<div class="grid grid-cols-2 gap-4">' +
+    '<div><strong>รหัสร้าน:</strong> ' + shop['รหัสร้าน'] + '</div>' +
+    '<div><strong>ชื่อร้าน:</strong> ' + shop['ชื่อร้าน'] + '</div>' +
+    '<div><strong>อีเมล:</strong> ' + shop['อีเมล'] + '</div>' +
+    '<div><strong>แพ็คเกจ:</strong> ' + shop['แพ็คเกจ'] + '</div>' +
+    '<div><strong>วันหมดอายุ:</strong> ' + expiryDate.toLocaleDateString('th-TH') + '</div>' +
+    '<div><strong>วันที่สร้าง:</strong> ' + createDate.toLocaleDateString('th-TH') + '</div>' +
+    '<div><strong>สถานะ:</strong> ' + shop['สถานะ'] + '</div>' +
+    '<div><strong>Sheet ID:</strong><br><span class="text-xs text-gray-600">' + shop['SheetID'] + '</span></div>' +
+    '</div>' +
+    '</div>';
+
+  document.getElementById('shopDetailsContent').innerHTML = html;
+  openModal('shopDetailsModal');
+}
+
+function extendLicense(shopId) {
+  Swal.fire({
+    title: 'ต่ออายุไลเซ่นส์',
+    input: 'select',
+    inputOptions: {
+      '30': '1 เดือน (30 วัน)',
+      '365': '1 ปี (365 วัน)',
+      'custom': 'กำหนดเอง...'
+    },
+    inputPlaceholder: 'เลือกระยะเวลา',
+    showCancelButton: true,
+    confirmButtonText: 'ต่ออายุ',
+    cancelButtonText: 'ยกเลิก'
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      var days = parseInt(result.value);
+
+      if (result.value === 'custom') {
+        Swal.fire({
+          title: 'กำหนดจำนวนวัน',
+          input: 'number',
+          inputAttributes: {
+            min: 1,
+            step: 1
+          },
+          showCancelButton: true
+        }).then(function(customResult) {
+          if (customResult.isConfirmed) {
+            performExtend(shopId, parseInt(customResult.value));
+          }
+        });
+      } else {
+        performExtend(shopId, days);
+      }
+    }
+  });
+}
+
+function performExtend(shopId, days) {
+  var shop = allShops.find(function(s) { return s['รหัสร้าน'] === shopId; });
+  var currentExpiry = new Date(shop['วันหมดอายุ']);
+  var today = new Date();
+
+  var baseDate = currentExpiry > today ? currentExpiry : today;
+  var newExpiry = new Date(baseDate);
+  newExpiry.setDate(newExpiry.getDate() + days);
+
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        Swal.fire('สำเร็จ!', 'ต่ออายุไลเซ่นส์แล้ว', 'success');
+        loadShops();
+      } else {
+        Swal.fire('Error', 'ไม่สามารถต่ออายุได้', 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      Swal.fire('Error', error.message, 'error');
+    })
+    .updateShopLicense(shopId, newExpiry.toISOString());
+}
+
+function toggleShopStatus(shopId, currentStatus) {
+  var newStatus = currentStatus === 'ใช้งาน' ? 'ระงับ' : 'ใช้งาน';
+  var action = newStatus === 'ระงับ' ? 'ระงับ' : 'เปิดใช้งาน';
+
+  Swal.fire({
+    title: action + 'ร้าน?',
+    text: 'คุณต้องการ' + action + 'ร้านนี้หรือไม่?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: action,
+    cancelButtonText: 'ยกเลิก'
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      showLoading();
+      google.script.run
+        .withSuccessHandler(function(result) {
+          hideLoading();
+          if (result.success) {
+            Swal.fire('สำเร็จ!', action + 'ร้านแล้ว', 'success');
+            loadShops();
+          } else {
+            Swal.fire('Error', 'ไม่สามารถเปลี่ยนสถานะได้', 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          hideLoading();
+          Swal.fire('Error', error.message, 'error');
+        })
+        .updateShopStatus(shopId, newStatus);
+    }
+  });
+}
+
+function loadLicenseStats() {
+  var monthlyCount = 0;
+  var yearlyCount = 0;
+  var expiringSoon = [];
+
+  var today = new Date();
+  var inThirtyDays = new Date();
+  inThirtyDays.setDate(today.getDate() + 30);
+
+  for (var i = 0; i < allShops.length; i++) {
+    var shop = allShops[i];
+
+    if (shop['แพ็คเกจ'] === 'รายเดือน') monthlyCount++;
+    if (shop['แพ็คเกจ'] === 'รายปี') yearlyCount++;
+
+    var expiryDate = new Date(shop['วันหมดอายุ']);
+    if (expiryDate <= inThirtyDays && expiryDate > today && shop['สถานะ'] === 'ใช้งาน') {
+      var daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+      expiringSoon.push({
+        shop: shop,
+        daysLeft: daysLeft
+      });
+    }
+  }
+
+  document.getElementById('monthlyRevenue').textContent = '฿' + (monthlyCount * 299).toLocaleString();
+  document.getElementById('yearlyRevenue').textContent = '฿' + (yearlyCount * 2999).toLocaleString();
+
+  var expiringHtml = '';
+  if (expiringSoon.length === 0) {
+    expiringHtml = '<p class="text-gray-500 text-center py-4">ไม่มีไลเซ่นส์ใกล้หมดอายุ</p>';
+  } else {
+    for (var i = 0; i < expiringSoon.length; i++) {
+      var item = expiringSoon[i];
+      expiringHtml += '<div class="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">' +
+        '<div>' +
+        '<p class="font-semibold">' + item.shop['ชื่อร้าน'] + '</p>' +
+        '<p class="text-sm text-gray-600">' + item.shop['อีเมล'] + '</p>' +
+        '</div>' +
+        '<div class="text-right">' +
+        '<p class="font-bold text-orange-600">' + item.daysLeft + ' วัน</p>' +
+        '<button onclick="extendLicense(\'' + item.shop['รหัสร้าน'] + '\')" class="text-sm text-blue-600 hover:underline">ต่ออายุ</button>' +
+        '</div>' +
+        '</div>';
+    }
+  }
+
+  document.getElementById('expiringLicenses').innerHTML = expiringHtml;
+}
+
+function openAddShopModal() {
+  Swal.fire('Coming Soon', 'ฟีเจอร์เพิ่มร้านด้วยตนเอง - Coming soon', 'info');
+}
+
+function openModal(modalId) {
+  document.getElementById(modalId).classList.add('active');
+}
+
+function closeModal(modalId) {
+  document.getElementById(modalId).classList.remove('active');
+}
+</script>
+
+</body>
+</html>
