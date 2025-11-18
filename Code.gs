@@ -2048,18 +2048,241 @@ function createSampleShop() {
     // เพิ่มข้อมูลตัวอย่าง
     var sheetId = result.sheetId;
 
-    // หมวดหมู่
+    // 1. หมวดหมู่
     addCategory(sheetId, 'กาแฟ');
     addCategory(sheetId, 'ชา');
     addCategory(sheetId, 'น้ำผลไม้');
+    addCategory(sheetId, 'เบเกอรี่');
 
-    // วัตถุดิบ
-    addMaterial(sheetId, { name: 'เมล็ดกาแฟ', unit: 'กรัม', pricePerUnit: 0.5, quantity: 1000, minQuantity: 200 });
-    addMaterial(sheetId, { name: 'นม', unit: 'มล.', pricePerUnit: 0.05, quantity: 5000, minQuantity: 1000 });
-    addMaterial(sheetId, { name: 'น้ำเชื่อม', unit: 'กรัม', pricePerUnit: 0.03, quantity: 2000, minQuantity: 500 });
-    addMaterial(sheetId, { name: 'น้ำแข็ง', unit: 'กรัม', pricePerUnit: 0.01, quantity: 10000, minQuantity: 2000 });
+    // 2. วัตถุดิบ
+    var materials = [];
+    materials.push(addMaterial(sheetId, { name: 'เมล็ดกาแฟ', unit: 'กรัม', pricePerUnit: 0.5, quantity: 2000, minQuantity: 200 }));
+    materials.push(addMaterial(sheetId, { name: 'นมสด', unit: 'มล.', pricePerUnit: 0.05, quantity: 5000, minQuantity: 1000 }));
+    materials.push(addMaterial(sheetId, { name: 'นมข้นหวาน', unit: 'มล.', pricePerUnit: 0.08, quantity: 2000, minQuantity: 500 }));
+    materials.push(addMaterial(sheetId, { name: 'น้ำเชื่อม', unit: 'มล.', pricePerUnit: 0.03, quantity: 3000, minQuantity: 500 }));
+    materials.push(addMaterial(sheetId, { name: 'น้ำแข็ง', unit: 'กรัม', pricePerUnit: 0.01, quantity: 10000, minQuantity: 2000 }));
+    materials.push(addMaterial(sheetId, { name: 'ใบชาเขียว', unit: 'กรัม', pricePerUnit: 0.3, quantity: 500, minQuantity: 100 }));
+    materials.push(addMaterial(sheetId, { name: 'ใบชาไทย', unit: 'กรัม', pricePerUnit: 0.2, quantity: 1000, minQuantity: 200 }));
+    materials.push(addMaterial(sheetId, { name: 'ผงโกโก้', unit: 'กรัม', pricePerUnit: 0.4, quantity: 800, minQuantity: 150 }));
+    materials.push(addMaterial(sheetId, { name: 'วิปปิ้งครีม', unit: 'มล.', pricePerUnit: 0.1, quantity: 1500, minQuantity: 300 }));
+    materials.push(addMaterial(sheetId, { name: 'แก้วกระดาษ 16oz', unit: 'ใบ', pricePerUnit: 3, quantity: 500, minQuantity: 100 }));
 
-    Logger.log('Sample shop created with ID: ' + result.shopId);
+    // 3. ตัวเลือกสินค้า (ความหวาน)
+    addProductOption(sheetId, {
+      'กลุ่มตัวเลือก': 'ความหวาน',
+      'ชื่อตัวเลือก': '0% (ไม่หวาน)',
+      'ราคาเพิ่ม/ลด': 0,
+      'วัตถุดิบ': [],
+      'เป็นค่าเริ่มต้น': 'false',
+      'ลำดับ': 1,
+      'สถานะ': 'ใช้งาน'
+    });
+    addProductOption(sheetId, {
+      'กลุ่มตัวเลือก': 'ความหวาน',
+      'ชื่อตัวเลือก': '25%',
+      'ราคาเพิ่ม/ลด': 0,
+      'วัตถุดิบ': [],
+      'เป็นค่าเริ่มต้น': 'false',
+      'ลำดับ': 2,
+      'สถานะ': 'ใช้งาน'
+    });
+    addProductOption(sheetId, {
+      'กลุ่มตัวเลือก': 'ความหวาน',
+      'ชื่อตัวเลือก': '50%',
+      'ราคาเพิ่ม/ลด': 0,
+      'วัตถุดิบ': [],
+      'เป็นค่าเริ่มต้น': 'false',
+      'ลำดับ': 3,
+      'สถานะ': 'ใช้งาน'
+    });
+    addProductOption(sheetId, {
+      'กลุ่มตัวเลือก': 'ความหวาน',
+      'ชื่อตัวเลือก': '100% (หวานปกติ)',
+      'ราคาเพิ่ม/ลด': 0,
+      'วัตถุดิบ': [],
+      'เป็นค่าเริ่มต้น': 'true',
+      'ลำดับ': 4,
+      'สถานะ': 'ใช้งาน'
+    });
+
+    // 4. ตัวเลือกสินค้า (น้ำแข็ง)
+    addProductOption(sheetId, {
+      'กลุ่มตัวเลือก': 'น้ำแข็ง',
+      'ชื่อตัวเลือก': 'ปกติ',
+      'ราคาเพิ่ม/ลด': 0,
+      'วัตถุดิบ': [],
+      'เป็นค่าเริ่มต้น': 'true',
+      'ลำดับ': 1,
+      'สถานะ': 'ใช้งาน'
+    });
+    addProductOption(sheetId, {
+      'กลุ่มตัวเลือก': 'น้ำแข็ง',
+      'ชื่อตัวเลือก': 'น้อย',
+      'ราคาเพิ่ม/ลด': 0,
+      'วัตถุดิบ': [],
+      'เป็นค่าเริ่มต้น': 'false',
+      'ลำดับ': 2,
+      'สถานะ': 'ใช้งาน'
+    });
+    addProductOption(sheetId, {
+      'กลุ่มตัวเลือก': 'น้ำแข็ง',
+      'ชื่อตัวเลือก': 'ไม่ใส่',
+      'ราคาเพิ่ม/ลด': 0,
+      'วัตถุดิบ': [],
+      'เป็นค่าเริ่มต้น': 'false',
+      'ลำดับ': 3,
+      'สถานะ': 'ใช้งาน'
+    });
+
+    // 5. ตัวเลือกสินค้า (Topping)
+    addProductOption(sheetId, {
+      'กลุ่มตัวเลือก': 'Topping',
+      'ชื่อตัวเลือก': 'วิปปิ้งครีม',
+      'ราคาเพิ่ม/ลด': 10,
+      'วัตถุดิบ': [],
+      'เป็นค่าเริ่มต้น': 'false',
+      'ลำดับ': 1,
+      'สถานะ': 'ใช้งาน'
+    });
+    addProductOption(sheetId, {
+      'กลุ่มตัวเลือก': 'Topping',
+      'ชื่อตัวเลือก': 'ช็อตเพิ่ม',
+      'ราคาเพิ่ม/ลด': 15,
+      'วัตถุดิบ': [],
+      'เป็นค่าเริ่มต้น': 'false',
+      'ลำดับ': 2,
+      'สถานะ': 'ใช้งาน'
+    });
+
+    // 6. สินค้า - กาแฟ
+    addProduct(sheetId, {
+      'ชื่อสินค้า': 'Espresso',
+      'หมวดหมู่': 'กาแฟ',
+      'ราคาขาย': 40,
+      'ราคาทุน': 15,
+      'วัตถุดิบ': [],
+      'ตัวเลือก': ['ความหวาน'],
+      'เวลาทำ(นาที)': 3,
+      'สถานะ': 'ใช้งาน',
+      'รูปภาพ': ''
+    });
+
+    addProduct(sheetId, {
+      'ชื่อสินค้า': 'Americano',
+      'หมวดหมู่': 'กาแฟ',
+      'ราคาขาย': 45,
+      'ราคาทุน': 18,
+      'วัตถุดิบ': [],
+      'ตัวเลือก': ['ความหวาน', 'น้ำแข็ง'],
+      'เวลาทำ(นาที)': 3,
+      'สถานะ': 'ใช้งาน',
+      'รูปภาพ': ''
+    });
+
+    addProduct(sheetId, {
+      'ชื่อสินค้า': 'Latte',
+      'หมวดหมู่': 'กาแฟ',
+      'ราคาขาย': 55,
+      'ราคาทุน': 25,
+      'วัตถุดิบ': [],
+      'ตัวเลือก': ['ความหวาน', 'น้ำแข็ง', 'Topping'],
+      'เวลาทำ(นาที)': 4,
+      'สถานะ': 'ใช้งาน',
+      'รูปภาพ': ''
+    });
+
+    addProduct(sheetId, {
+      'ชื่อสินค้า': 'Cappuccino',
+      'หมวดหมู่': 'กาแฟ',
+      'ราคาขาย': 55,
+      'ราคาทุน': 25,
+      'วัตถุดิบ': [],
+      'ตัวเลือก': ['ความหวาน', 'น้ำแข็ง', 'Topping'],
+      'เวลาทำ(นาที)': 4,
+      'สถานะ': 'ใช้งาน',
+      'รูปภาพ': ''
+    });
+
+    addProduct(sheetId, {
+      'ชื่อสินค้า': 'Mocha',
+      'หมวดหมู่': 'กาแฟ',
+      'ราคาขาย': 60,
+      'ราคาทุน': 28,
+      'วัตถุดิบ': [],
+      'ตัวเลือก': ['ความหวาน', 'น้ำแข็ง', 'Topping'],
+      'เวลาทำ(นาที)': 5,
+      'สถานะ': 'ใช้งาน',
+      'รูปภาพ': ''
+    });
+
+    // 7. สินค้า - ชา
+    addProduct(sheetId, {
+      'ชื่อสินค้า': 'ชาเขียว',
+      'หมวดหมู่': 'ชา',
+      'ราคาขาย': 45,
+      'ราคาทุน': 20,
+      'วัตถุดิบ': [],
+      'ตัวเลือก': ['ความหวาน', 'น้ำแข็ง'],
+      'เวลาทำ(นาที)': 3,
+      'สถานะ': 'ใช้งาน',
+      'รูปภาพ': ''
+    });
+
+    addProduct(sheetId, {
+      'ชื่อสินค้า': 'ชาไทย',
+      'หมวดหมู่': 'ชา',
+      'ราคาขาย': 40,
+      'ราคาทุน': 18,
+      'วัตถุดิบ': [],
+      'ตัวเลือก': ['ความหวาน', 'น้ำแข็ง'],
+      'เวลาทำ(นาที)': 3,
+      'สถานะ': 'ใช้งาน',
+      'รูปภาพ': ''
+    });
+
+    addProduct(sheetId, {
+      'ชื่อสินค้า': 'ชานม',
+      'หมวดหมู่': 'ชา',
+      'ราคาขาย': 50,
+      'ราคาทุน': 22,
+      'วัตถุดิบ': [],
+      'ตัวเลือก': ['ความหวาน', 'น้ำแข็ง'],
+      'เวลาทำ(นาที)': 4,
+      'สถานะ': 'ใช้งาน',
+      'รูปภาพ': ''
+    });
+
+    // 8. สินค้า - น้ำผลไม้
+    addProduct(sheetId, {
+      'ชื่อสินค้า': 'โกโก้',
+      'หมวดหมู่': 'น้ำผลไม้',
+      'ราคาขาย': 45,
+      'ราคาทุน': 20,
+      'วัตถุดิบ': [],
+      'ตัวเลือก': ['ความหวาน', 'น้ำแข็ง', 'Topping'],
+      'เวลาทำ(นาที)': 3,
+      'สถานะ': 'ใช้งาน',
+      'รูปภาพ': ''
+    });
+
+    // 9. ตั้งค่าร้าน
+    updateSettings(sheetId, {
+      'ชื่อร้าน': 'ร้านกาแฟตัวอย่าง',
+      'ที่อยู่': '123 ถ.ตัวอย่าง ต.ตัวอย่าง อ.เมือง จ.กรุงเทพฯ 10100',
+      'เบอร์โทร': '02-123-4567',
+      'หมายเลขพร้อมเพย์': '0995588665',
+      'เปิดภาษี': 'true',
+      'ประเภทภาษี': 'รวมในราคา',
+      'ข้อความใบเสร็จ': 'ขอบคุณที่ใช้บริการ กลับมาใหม่นะคะ 😊',
+      'ขนาดใบเสร็จ': '58mm',
+      'รูปแบบเลขออเดอร์': 'PREFIX-YYYYMMDD-XXX',
+      'Prefix เลขออเดอร์': 'DEMO'
+    });
+
+    Logger.log('Sample shop created successfully!');
+    Logger.log('Shop ID: ' + result.shopId);
+    Logger.log('Email: demo@example.com');
+    Logger.log('Password: demo123');
   }
 
   return result;
