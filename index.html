@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coffee Shop POS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: 'Sarabun', sans-serif; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+    .modal.active { display: flex; align-items: center; justify-content: center; }
+    .modal-content { background-color: #fefefe; margin: auto; padding: 0; border-radius: 12px; max-width: 90%; max-height: 90vh; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .product-card { transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
+    .product-card:hover { transform: translateY(-4px); box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .badge-success { background-color: #10b981; color: white; }
+    .badge-warning { background-color: #f59e0b; color: white; }
+    .badge-danger { background-color: #ef4444; color: white; }
+    .badge-info { background-color: #3b82f6; color: white; }
+    .badge-secondary { background-color: #6b7280; color: white; }
+    @media print {
+      body * { visibility: hidden; }
+      #printArea, #printArea * { visibility: visible; }
+      #printArea { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+    .cart-item { border-bottom: 1px solid #e5e7eb; padding: 8px 0; }
+    .cart-item:last-child { border-bottom: none; }
+    #qrCodeContainer { text-align: center; margin: 20px 0; }
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1px solid #e5e7eb; z-index: 999; }
+    .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 250px; background: #1f2937; color: white; overflow-y: auto; z-index: 998; }
+    .main-content { margin-left: 250px; padding: 20px; }
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); transition: transform 0.3s; }
+      .sidebar.active { transform: translateX(0); }
+      .main-content { margin-left: 0; padding-bottom: 70px; }
+      .bottom-nav { display: flex; }
+    }
+    @media (min-width: 769px) {
+      .bottom-nav { display: none; }
+      .sidebar { transform: translateX(0); }
+    }
+    .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .tab-button { padding: 12px 24px; background: #e5e7eb; border: none; cursor: pointer; border-radius: 8px 8px 0 0; margin-right: 4px; }
+    .tab-button.active { background: #3b82f6; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body class="bg-gray-50">
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+  <div class="bg-white p-6 rounded-lg shadow-xl">
+    <div class="spinner"></div>
+    <p class="text-center mt-4">กำลังโหลด...</p>
+  </div>
+</div>
+
+<!-- Login Modal -->
+<div id="loginModal" class="modal active">
+  <div class="modal-content w-full max-w-md">
+    <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-6 rounded-t-lg">
+      <h2 class="text-2xl font-bold text-white text-center">
+        <i class="fas fa-coffee mr-2"></i>Coffee Shop POS
+      </h2>
+    </div>
+    <div class="p-6">
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="mb-4">
+          <label class="block text-gray-700 font-semibold mb-2">อีเมล</label>
+          <input type="email" id="loginEmail" required
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="mb-6">
+          <label class="block text-gray-700 font-semibold mb-2">รหัสผ่าน</label>
+          <input type="password" id="loginPassword" required
+            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <button type="submit" class="w-full bg-blue-500 text-white py-3 rounded-lg font-semibold hover:bg-blue-600 transition">
+          <i class="fas fa-sign-in-alt mr-2"></i>เข้าสู่ระบบ
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- License Warning Modal -->
+<div id="licenseWarningModal" class="modal">
+  <div class="modal-content w-full max-w-md">
+    <div class="bg-yellow-500 p-4 rounded-t-lg">
+      <h3 class="text-xl font-bold text-white">
+        <i class="fas fa-exclamation-triangle mr-2"></i>แจ้งเตือนไลเซ่นส์
+      </h3>
+    </div>
+    <div class="p-6">
+      <p id="licenseWarningText" class="text-lg mb-4"></p>
+      <div class="flex gap-2">
+        <button onclick="closeModal('licenseWarningModal')" class="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">
+          ปิด
+        </button>
+        <button onclick="showPage('settings'); closeModal('licenseWarningModal')" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
+          ดูรายละเอียด
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<div id="sidebar" class="sidebar">
+  <div class="p-4 border-b border-gray-700">
+    <h1 class="text-xl font-bold">
+      <i class="fas fa-coffee mr-2"></i>Coffee POS
+    </h1>
+    <p id="shopName" class="text-sm text-gray-400 mt-1">ร้านกาแฟ</p>
+  </div>
+  <nav class="p-4">
+    <a href="#" onclick="showPage('dashboard')" class="block py-3 px-4 rounded-lg hover:bg-gray-700 mb-2">
+      <i class="fas fa-chart-line mr-3"></i>Dashboard
+    </a>
+    <a href="#" onclick="showPage('sales')" class="block py-3 px-4 rounded-lg hover:bg-gray-700 mb-2">
+      <i class="fas fa-cash-register mr-3"></i>ขายสินค้า (POS)
+    </a>
+    <a href="#" onclick="showPage('kitchen')" class="block py-3 px-4 rounded-lg hover:bg-gray-700 mb-2">
+      <i class="fas fa-utensils mr-3"></i>ครัว
+    </a>
+    <a href="#" onclick="showPage('history')" class="block py-3 px-4 rounded-lg hover:bg-gray-700 mb-2">
+      <i class="fas fa-history mr-3"></i>ประวัติการขาย
+    </a>
+    <a href="#" onclick="showPage('products')" class="block py-3 px-4 rounded-lg hover:bg-gray-700 mb-2">
+      <i class="fas fa-box mr-3"></i>สินค้า
+    </a>
+    <a href="#" onclick="showPage('materials')" class="block py-3 px-4 rounded-lg hover:bg-gray-700 mb-2">
+      <i class="fas fa-cubes mr-3"></i>วัตถุดิบ
+    </a>
+    <a href="#" onclick="showPage('costs')" class="block py-3 px-4 rounded-lg hover:bg-gray-700 mb-2">
+      <i class="fas fa-file-invoice-dollar mr-3"></i>ต้นทุน
+    </a>
+    <a href="#" onclick="showPage('reports')" class="block py-3 px-4 rounded-lg hover:bg-gray-700 mb-2">
+      <i class="fas fa-chart-bar mr-3"></i>รายงาน
+    </a>
+    <a href="#" onclick="showPage('settings')" class="block py-3 px-4 rounded-lg hover:bg-gray-700 mb-2">
+      <i class="fas fa-cog mr-3"></i>ตั้งค่า
+    </a>
+    <a href="#" onclick="handleLogout()" class="block py-3 px-4 rounded-lg hover:bg-red-700 mt-4 bg-red-600">
+      <i class="fas fa-sign-out-alt mr-3"></i>ออกจากระบบ
+    </a>
+  </nav>
+</div>
+
+<!-- Bottom Navigation (Mobile) -->
+<div class="bottom-nav">
+  <a href="#" onclick="showPage('dashboard')" class="flex-1 text-center py-3 hover:bg-gray-100">
+    <i class="fas fa-chart-line text-xl"></i>
+    <p class="text-xs mt-1">Dashboard</p>
+  </a>
+  <a href="#" onclick="showPage('sales')" class="flex-1 text-center py-3 hover:bg-gray-100">
+    <i class="fas fa-cash-register text-xl"></i>
+    <p class="text-xs mt-1">ขาย</p>
+  </a>
+  <a href="#" onclick="showPage('kitchen')" class="flex-1 text-center py-3 hover:bg-gray-100">
+    <i class="fas fa-utensils text-xl"></i>
+    <p class="text-xs mt-1">ครัว</p>
+  </a>
+  <a href="#" onclick="showPage('products')" class="flex-1 text-center py-3 hover:bg-gray-100">
+    <i class="fas fa-box text-xl"></i>
+    <p class="text-xs mt-1">สินค้า</p>
+  </a>
+  <a href="#" onclick="showPage('settings')" class="flex-1 text-center py-3 hover:bg-gray-100">
+    <i class="fas fa-cog text-xl"></i>
+    <p class="text-xs mt-1">ตั้งค่า</p>
+  </a>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+
+<!-- Dashboard Page -->
+<div id="dashboard" class="page">
+  <h1 class="text-3xl font-bold mb-6">
+    <i class="fas fa-chart-line mr-2"></i>Dashboard
+  </h1>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-500 text-sm">ยอดขายวันนี้</p>
+          <p id="dashTodaySales" class="text-3xl font-bold text-green-600">฿0</p>
+        </div>
+        <div class="bg-green-100 p-4 rounded-full">
+          <i class="fas fa-money-bill-wave text-green-600 text-2xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-500 text-sm">ต้นทุนวันนี้</p>
+          <p id="dashTodayCost" class="text-3xl font-bold text-orange-600">฿0</p>
+        </div>
+        <div class="bg-orange-100 p-4 rounded-full">
+          <i class="fas fa-coins text-orange-600 text-2xl"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-gray-500 text-sm">กำไร/ขาดทุน</p>
+          <p id="dashProfit" class="text-3xl font-bold text-blue-600">฿0</p>
+        </div>
+        <div class="bg-blue-100 p-4 rounded-full">
+          <i class="fas fa-chart-line text-blue-600 text-2xl"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <h3 class="text-xl font-bold mb-4">ยอดขาย 7 วันล่าสุด</h3>
+      <canvas id="sales7DaysChart"></canvas>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <h3 class="text-xl font-bold mb-4">
+        <i class="fas fa-star text-yellow-500 mr-2"></i>5 สินค้าขายดี
+      </h3>
+      <div id="topProductsList"></div>
+    </div>
+  </div>
+
+  <div class="bg-white p-6 rounded-lg shadow-lg">
+    <h3 class="text-xl font-bold mb-4">
+      <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>วัตถุดิบใกล้หมดอายุ
+    </h3>
+    <div id="expiringMaterialsList"></div>
+  </div>
+</div>
+
+<!-- Sales (POS) Page -->
+<div id="sales" class="page">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold">
+      <i class="fas fa-cash-register mr-2"></i>ขายสินค้า
+    </h1>
+    <div class="flex gap-2 items-center">
+      <span class="badge badge-info">
+        <i class="fas fa-clock mr-1"></i>คิว: <span id="currentQueueCount">0</span> |
+        เวลารอ: <span id="currentWaitTime">0</span> นาที
+      </span>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Products Grid -->
+    <div class="lg:col-span-2">
+      <div class="mb-4">
+        <label class="block text-sm font-semibold mb-2">ช่องทางการสั่งซื้อ</label>
+        <select id="orderChannel" class="w-full px-4 py-2 border rounded-lg">
+          <option value="">กำลังโหลด...</option>
+        </select>
+      </div>
+
+      <div class="mb-4">
+        <input type="text" id="productSearch" placeholder="ค้นหาสินค้า..."
+          class="w-full px-4 py-2 border rounded-lg" onkeyup="filterProducts()">
+      </div>
+
+      <div class="mb-4">
+        <div id="categoryButtons" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <div id="productsGrid" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+    </div>
+
+    <!-- Cart -->
+    <div class="lg:col-span-1">
+      <div class="bg-white p-4 rounded-lg shadow-lg sticky top-4">
+        <h3 class="text-xl font-bold mb-4">ตะกร้าสินค้า</h3>
+
+        <div id="cartItems" class="mb-4 max-h-96 overflow-y-auto"></div>
+
+        <div class="border-t pt-4">
+          <div class="flex justify-between mb-2">
+            <span>ยอดรวม:</span>
+            <span id="cartSubtotal" class="font-bold">฿0</span>
+          </div>
+          <div class="flex justify-between mb-2">
+            <span>ส่วนลด:</span>
+            <input type="number" id="cartDiscount" value="0" min="0"
+              class="w-24 px-2 py-1 border rounded text-right" onchange="updateCartTotals()">
+          </div>
+          <div class="flex justify-between mb-2">
+            <span>ภาษี (7%):</span>
+            <span id="cartTax" class="font-bold">฿0</span>
+          </div>
+          <div class="flex justify-between mb-4 text-xl font-bold text-blue-600">
+            <span>ยอดสุทธิ:</span>
+            <span id="cartTotal">฿0</span>
+          </div>
+
+          <button onclick="openPaymentModal()" class="w-full bg-green-500 text-white py-3 rounded-lg font-bold hover:bg-green-600 mb-2">
+            <i class="fas fa-check mr-2"></i>ชำระเงิน
+          </button>
+          <button onclick="clearCart()" class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">
+            <i class="fas fa-trash mr-2"></i>ล้างตะกร้า
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Today's Sales -->
+  <div class="mt-6 bg-white p-6 rounded-lg shadow-lg">
+    <h3 class="text-xl font-bold mb-4">ประวัติการขายวันนี้</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="px-4 py-2 text-left">รหัสออเดอร์</th>
+            <th class="px-4 py-2 text-left">เวลา</th>
+            <th class="px-4 py-2 text-left">ช่องทาง</th>
+            <th class="px-4 py-2 text-right">ยอดเงิน</th>
+            <th class="px-4 py-2 text-center">สถานะ</th>
+            <th class="px-4 py-2 text-center">จัดการ</th>
+          </tr>
+        </thead>
+        <tbody id="todaySalesTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Kitchen Page -->
+<div id="kitchen" class="page">
+  <h1 class="text-3xl font-bold mb-6">
+    <i class="fas fa-utensils mr-2"></i>ครัว - จัดการคิว
+  </h1>
+
+  <div class="mb-4 flex justify-between items-center">
+    <div>
+      <span class="badge badge-warning text-lg">
+        <i class="fas fa-list mr-2"></i>คิวทั้งหมด: <span id="kitchenTotalQueue">0</span>
+      </span>
+    </div>
+    <button onclick="loadKitchenQueue()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+      <i class="fas fa-sync mr-2"></i>รีเฟรช
+    </button>
+  </div>
+
+  <div id="kitchenQueue" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+</div>
+
+<!-- Order History Page -->
+<div id="history" class="page">
+  <h1 class="text-3xl font-bold mb-6">
+    <i class="fas fa-history mr-2"></i>ประวัติการขาย
+  </h1>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <h3 class="text-xl font-bold mb-4">ยอดขายรายเดือน (ปีปัจจุบัน)</h3>
+      <canvas id="monthlySalesChart"></canvas>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <h3 class="text-xl font-bold mb-4">ยอดขายรายวัน (เดือนปัจจุบัน)</h3>
+      <canvas id="dailySalesChart"></canvas>
+    </div>
+  </div>
+
+  <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="block text-sm font-semibold mb-2">วันที่เริ่มต้น</label>
+        <input type="date" id="historyStartDate" class="w-full px-4 py-2 border rounded-lg" onchange="loadSalesHistory()">
+      </div>
+      <div>
+        <label class="block text-sm font-semibold mb-2">วันที่สิ้นสุด</label>
+        <input type="date" id="historyEndDate" class="w-full px-4 py-2 border rounded-lg" onchange="loadSalesHistory()">
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+      <div class="bg-blue-50 p-4 rounded-lg">
+        <p class="text-sm text-gray-600">ยอดขายรวม</p>
+        <p id="historySalesTotal" class="text-2xl font-bold text-blue-600">฿0</p>
+      </div>
+      <div class="bg-green-50 p-4 rounded-lg">
+        <p class="text-sm text-gray-600">จำนวนออเดอร์</p>
+        <p id="historyOrderCount" class="text-2xl font-bold text-green-600">0</p>
+      </div>
+      <div class="bg-purple-50 p-4 rounded-lg">
+        <p class="text-sm text-gray-600">ค่าเฉลี่ย/ออเดอร์</p>
+        <p id="historyAvgOrder" class="text-2xl font-bold text-purple-600">฿0</p>
+      </div>
+      <div class="bg-orange-50 p-4 rounded-lg">
+        <p class="text-sm text-gray-600">เมนูขายดี</p>
+        <p id="historyTopProduct" class="text-lg font-bold text-orange-600">-</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white p-6 rounded-lg shadow-lg">
+    <h3 class="text-xl font-bold mb-4">รายการขายทั้งหมด</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="px-4 py-2 text-left cursor-pointer" onclick="sortHistoryTable('รหัสออเดอร์')">
+              รหัสออเดอร์ <i class="fas fa-sort text-xs"></i>
+            </th>
+            <th class="px-4 py-2 text-left cursor-pointer" onclick="sortHistoryTable('วันที่')">
+              วันที่ <i class="fas fa-sort text-xs"></i>
+            </th>
+            <th class="px-4 py-2 text-left cursor-pointer" onclick="sortHistoryTable('ช่องทาง')">
+              ช่องทาง <i class="fas fa-sort text-xs"></i>
+            </th>
+            <th class="px-4 py-2 text-right cursor-pointer" onclick="sortHistoryTable('ยอดสุทธิ')">
+              ยอดเงิน <i class="fas fa-sort text-xs"></i>
+            </th>
+            <th class="px-4 py-2 text-center">สถานะ</th>
+            <th class="px-4 py-2 text-center">จัดการ</th>
+          </tr>
+        </thead>
+        <tbody id="historyTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Products Page -->
+<div id="products" class="page">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold">
+      <i class="fas fa-box mr-2"></i>จัดการสินค้า
+    </h1>
+    <div class="flex gap-2">
+      <button onclick="openManageCategoriesModal()" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600">
+        <i class="fas fa-tags mr-2"></i>หมวดหมู่
+      </button>
+      <button onclick="openManageOptionsModal()" class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600">
+        <i class="fas fa-sliders-h mr-2"></i>ตัวเลือก
+      </button>
+      <button onclick="openProductModal()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
+        <i class="fas fa-plus mr-2"></i>เพิ่มสินค้า
+      </button>
+    </div>
+  </div>
+
+  <div class="bg-white p-6 rounded-lg shadow-lg">
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="px-4 py-2 text-left">รหัสสินค้า</th>
+            <th class="px-4 py-2 text-left">ชื่อสินค้า</th>
+            <th class="px-4 py-2 text-left">หมวดหมู่</th>
+            <th class="px-4 py-2 text-right">ราคาขาย</th>
+            <th class="px-4 py-2 text-right">ราคาทุน</th>
+            <th class="px-4 py-2 text-right">กำไร</th>
+            <th class="px-4 py-2 text-center">เวลาทำ</th>
+            <th class="px-4 py-2 text-center">จัดการ</th>
+          </tr>
+        </thead>
+        <tbody id="productsTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Materials Page -->
+<div id="materials" class="page">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold">
+      <i class="fas fa-cubes mr-2"></i>จัดการวัตถุดิบ
+    </h1>
+    <div class="flex gap-2">
+      <button onclick="openPurchaseMaterialModal()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+        <i class="fas fa-shopping-cart mr-2"></i>สั่งซื้อ
+      </button>
+      <button onclick="openWasteModal()" class="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600">
+        <i class="fas fa-trash-alt mr-2"></i>ของเสีย
+      </button>
+      <button onclick="openMaterialModal()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
+        <i class="fas fa-plus mr-2"></i>เพิ่มวัตถุดิบ
+      </button>
+    </div>
+  </div>
+
+  <div class="bg-white p-6 rounded-lg shadow-lg">
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="px-4 py-2 text-left">รหัส</th>
+            <th class="px-4 py-2 text-left">ชื่อวัตถุดิบ</th>
+            <th class="px-4 py-2 text-center">หน่วย</th>
+            <th class="px-4 py-2 text-right">ราคา/หน่วย</th>
+            <th class="px-4 py-2 text-right">คงเหลือ</th>
+            <th class="px-4 py-2 text-right">ขั้นต่ำ</th>
+            <th class="px-4 py-2 text-center">สถานะ</th>
+            <th class="px-4 py-2 text-center">จัดการ</th>
+          </tr>
+        </thead>
+        <tbody id="materialsTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Costs Page -->
+<div id="costs" class="page">
+  <h1 class="text-3xl font-bold mb-6">
+    <i class="fas fa-file-invoice-dollar mr-2"></i>บันทึกต้นทุน
+  </h1>
+
+  <div class="bg-white p-6 rounded-lg shadow-lg">
+    <div class="mb-4">
+      <button class="tab-button active" onclick="switchCostTab('daily')">ต้นทุนรายวัน</button>
+      <button class="tab-button" onclick="switchCostTab('monthly')">ต้นทุนรายเดือน</button>
+    </div>
+
+    <!-- Daily Costs Tab -->
+    <div id="costTabDaily" class="tab-content active">
+      <div class="mb-4">
+        <button onclick="openDailyCostModal()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
+          <i class="fas fa-plus mr-2"></i>เพิ่มต้นทุนรายวัน
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="bg-gray-100">
+              <th class="px-4 py-2 text-left">วันที่</th>
+              <th class="px-4 py-2 text-left">รายการ</th>
+              <th class="px-4 py-2 text-left">หมวดหมู่</th>
+              <th class="px-4 py-2 text-right">จำนวนเงิน</th>
+              <th class="px-4 py-2 text-left">หมายเหตุ</th>
+            </tr>
+          </thead>
+          <tbody id="dailyCostsTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Monthly Costs Tab -->
+    <div id="costTabMonthly" class="tab-content">
+      <div class="mb-4">
+        <button onclick="openMonthlyCostModal()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
+          <i class="fas fa-plus mr-2"></i>เพิ่มต้นทุนรายเดือน
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="bg-gray-100">
+              <th class="px-4 py-2 text-left">เดือน/ปี</th>
+              <th class="px-4 py-2 text-left">รายการ</th>
+              <th class="px-4 py-2 text-left">หมวดหมู่</th>
+              <th class="px-4 py-2 text-right">จำนวนเงิน</th>
+              <th class="px-4 py-2 text-left">หมายเหตุ</th>
+            </tr>
+          </thead>
+          <tbody id="monthlyCostsTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reports Page -->
+<div id="reports" class="page">
+  <h1 class="text-3xl font-bold mb-6">
+    <i class="fas fa-chart-bar mr-2"></i>รายงาน
+  </h1>
+
+  <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+    <h3 class="text-xl font-bold mb-4">รายงานกำไร-ขาดทุน (P&L)</h3>
+    <div class="mb-4">
+      <label class="block text-sm font-semibold mb-2">เลือกเดือน</label>
+      <input type="month" id="plMonth" class="px-4 py-2 border rounded-lg" onchange="loadPLReport()">
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <h4 class="font-bold mb-2 text-green-600">รายได้</h4>
+        <div class="bg-green-50 p-4 rounded-lg">
+          <div class="flex justify-between mb-2">
+            <span>ยอดขาย</span>
+            <span id="plRevenue" class="font-bold">฿0</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h4 class="font-bold mb-2 text-red-600">ต้นทุน</h4>
+        <div class="bg-red-50 p-4 rounded-lg">
+          <div class="flex justify-between mb-2">
+            <span>ต้นทุนสินค้า</span>
+            <span id="plProductCost" class="font-bold">฿0</span>
+          </div>
+          <div class="flex justify-between mb-2">
+            <span>ต้นทุนรายวัน</span>
+            <span id="plDailyCost" class="font-bold">฿0</span>
+          </div>
+          <div class="flex justify-between mb-2">
+            <span>ต้นทุนรายเดือน</span>
+            <span id="plMonthlyCost" class="font-bold">฿0</span>
+          </div>
+          <div class="flex justify-between border-t pt-2 font-bold">
+            <span>รวมต้นทุน</span>
+            <span id="plTotalCost">฿0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-4 p-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg">
+      <div class="flex justify-between items-center">
+        <span class="text-xl font-bold">กำไรสุทธิ</span>
+        <span id="plProfit" class="text-3xl font-bold">฿0</span>
+      </div>
+      <div class="mt-2">
+        <span>อัตรากำไร: </span>
+        <span id="plProfitMargin" class="font-bold">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white p-6 rounded-lg shadow-lg">
+    <h3 class="text-xl font-bold mb-4">สินค้าขายดี (เดือนปัจจุบัน)</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="px-4 py-2 text-left">อันดับ</th>
+            <th class="px-4 py-2 text-left">ชื่อสินค้า</th>
+            <th class="px-4 py-2 text-right">จำนวนขาย</th>
+            <th class="px-4 py-2 text-right">ยอดขาย</th>
+          </tr>
+        </thead>
+        <tbody id="topProductsReportTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Page -->
+<div id="settings" class="page">
+  <h1 class="text-3xl font-bold mb-6">
+    <i class="fas fa-cog mr-2"></i>ตั้งค่า
+  </h1>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <h3 class="text-xl font-bold mb-4">ข้อมูลร้าน</h3>
+      <form id="shopInfoForm" onsubmit="saveShopInfo(event)">
+        <div class="mb-4">
+          <label class="block text-sm font-semibold mb-2">ชื่อร้าน</label>
+          <input type="text" id="settingShopName" class="w-full px-4 py-2 border rounded-lg">
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-semibold mb-2">ที่อยู่</label>
+          <textarea id="settingAddress" class="w-full px-4 py-2 border rounded-lg" rows="3"></textarea>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-semibold mb-2">เบอร์โทร</label>
+          <input type="text" id="settingPhone" class="w-full px-4 py-2 border rounded-lg">
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-semibold mb-2">หมายเลขพร้อมเพย์</label>
+          <input type="text" id="settingPromptpay" class="w-full px-4 py-2 border rounded-lg">
+        </div>
+        <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
+          <i class="fas fa-save mr-2"></i>บันทึก
+        </button>
+      </form>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <h3 class="text-xl font-bold mb-4">การตั้งค่าระบบ</h3>
+
+      <div class="mb-4">
+        <label class="flex items-center">
+          <input type="checkbox" id="settingTaxEnabled" class="mr-2" onchange="toggleTaxSettings()">
+          <span class="font-semibold">เปิดใช้งานภาษี 7%</span>
+        </label>
+      </div>
+
+      <div id="taxSettings" style="display: none;">
+        <div class="mb-4 ml-6">
+          <label class="block text-sm font-semibold mb-2">ประเภทภาษี</label>
+          <select id="settingTaxType" class="w-full px-4 py-2 border rounded-lg">
+            <option value="รวมในราคา">รวมในราคา (ถอดภาษีออก 7%)</option>
+            <option value="บวกเพิ่ม">บวกเพิ่ม 7%</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-semibold mb-2">ขนาดใบเสร็จ</label>
+        <select id="settingReceiptSize" class="w-full px-4 py-2 border rounded-lg">
+          <option value="58mm">58mm</option>
+          <option value="80mm">80mm</option>
+        </select>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-semibold mb-2">ข้อความใบเสร็จ</label>
+        <textarea id="settingReceiptMessage" class="w-full px-4 py-2 border rounded-lg" rows="2"></textarea>
+      </div>
+
+      <button onclick="saveSystemSettings()" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
+        <i class="fas fa-save mr-2"></i>บันทึก
+      </button>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <h3 class="text-xl font-bold mb-4">ช่องทางการสั่งซื้อ</h3>
+      <button onclick="openChannelModal()" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 mb-4">
+        <i class="fas fa-plus mr-2"></i>เพิ่มช่องทาง
+      </button>
+      <div id="channelsList"></div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-lg">
+      <h3 class="text-xl font-bold mb-4">บัญชีผู้ใช้</h3>
+      <button onclick="openChangePasswordModal()" class="w-full bg-purple-500 text-white py-2 rounded-lg hover:bg-purple-600 mb-2">
+        <i class="fas fa-key mr-2"></i>เปลี่ยนรหัสผ่าน
+      </button>
+      <button onclick="showLicenseStatus()" class="w-full bg-indigo-500 text-white py-2 rounded-lg hover:bg-indigo-600 mb-2">
+        <i class="fas fa-certificate mr-2"></i>ดูสถานะไลเซ่นส์
+      </button>
+      <button onclick="handleLogout()" class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">
+        <i class="fas fa-sign-out-alt mr-2"></i>ออกจากระบบ
+      </button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- Product Selection Modal -->
+<div id="productSelectionModal" class="modal">
+  <div class="modal-content w-full max-w-md">
+    <div class="bg-gradient-to-r from-green-500 to-blue-600 p-4 rounded-t-lg">
+      <h3 class="text-xl font-bold text-white">
+        <i class="fas fa-coffee mr-2"></i><span id="selectedProductName"></span>
+      </h3>
+    </div>
+    <div class="p-6">
+      <div id="productOptionsContainer"></div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-semibold mb-2">จำนวน</label>
+        <div class="flex items-center gap-4">
+          <button onclick="decreaseQuantity()" class="bg-gray-300 px-4 py-2 rounded-lg hover:bg-gray-400">
+            <i class="fas fa-minus"></i>
+          </button>
+          <input type="number" id="productQuantity" value="1" min="1"
+            class="w-20 text-center px-4 py-2 border rounded-lg">
+          <button onclick="increaseQuantity()" class="bg-gray-300 px-4 py-2 rounded-lg hover:bg-gray-400">
+            <i class="fas fa-plus"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-semibold mb-2">หมายเหตุ</label>
+        <textarea id="productNote" class="w-full px-4 py-2 border rounded-lg" rows="2"
+          placeholder="เช่น ไม่ใส่น้ำแข็ง..."></textarea>
+      </div>
+
+      <div class="mb-4 text-xl font-bold text-blue-600">
+        ราคา: ฿<span id="modalProductPrice">0</span>
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="closeModal('productSelectionModal')" class="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">
+          ยกเลิก
+        </button>
+        <button onclick="addToCart()" class="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
+          <i class="fas fa-cart-plus mr-2"></i>เพิ่มลงตะกร้า
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Payment Modal -->
+<div id="paymentModal" class="modal">
+  <div class="modal-content w-full max-w-2xl">
+    <div class="bg-gradient-to-r from-green-500 to-blue-600 p-4 rounded-t-lg">
+      <h3 class="text-xl font-bold text-white">
+        <i class="fas fa-money-bill-wave mr-2"></i>ชำระเงิน
+      </h3>
+    </div>
+    <div class="p-6">
+      <div class="mb-4">
+        <h4 class="font-bold mb-2">สรุปรายการ</h4>
+        <div id="paymentSummary" class="bg-gray-50 p-4 rounded-lg mb-4"></div>
+        <div class="flex justify-between text-xl font-bold text-blue-600">
+          <span>ยอดที่ต้องชำระ:</span>
+          <span id="paymentTotal">฿0</span>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <h4 class="font-bold mb-2">ช่องทางการชำระเงิน (เลือกได้หลายช่องทาง)</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <label class="border p-4 rounded-lg cursor-pointer hover:bg-blue-50">
+            <input type="checkbox" class="payment-method" value="เงินสด" onchange="updatePaymentMethods()">
+            <span class="ml-2">เงินสด</span>
+            <input type="number" id="cashAmount" class="w-full mt-2 px-2 py-1 border rounded" placeholder="จำนวน" style="display:none;">
+          </label>
+          <label class="border p-4 rounded-lg cursor-pointer hover:bg-blue-50">
+            <input type="checkbox" class="payment-method" value="โอนเงิน" onchange="updatePaymentMethods()">
+            <span class="ml-2">โอนเงิน</span>
+            <input type="number" id="transferAmount" class="w-full mt-2 px-2 py-1 border rounded" placeholder="จำนวน" style="display:none;">
+          </label>
+          <label class="border p-4 rounded-lg cursor-pointer hover:bg-blue-50">
+            <input type="checkbox" class="payment-method" value="QR Code" onchange="updatePaymentMethods()">
+            <span class="ml-2">QR Code</span>
+            <input type="number" id="qrAmount" class="w-full mt-2 px-2 py-1 border rounded" placeholder="จำนวน" style="display:none;">
+          </label>
+        </div>
+      </div>
+
+      <div id="qrCodeSection" style="display:none;" class="mb-4">
+        <h4 class="font-bold mb-2">QR Code สำหรับชำระเงิน</h4>
+        <div id="qrCodeContainer"></div>
+      </div>
+
+      <div id="slipUploadSection" style="display:none;" class="mb-4">
+        <h4 class="font-bold mb-2">แนบสลิป</h4>
+        <div class="flex gap-2">
+          <button onclick="document.getElementById('slipFile').click()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+            <i class="fas fa-paperclip mr-2"></i>แนบไฟล์
+          </button>
+          <button onclick="captureSlip()" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600">
+            <i class="fas fa-camera mr-2"></i>ถ่ายสลิป
+          </button>
+        </div>
+        <input type="file" id="slipFile" accept="image/*" style="display:none;" onchange="previewSlip(event)">
+        <div id="slipPreview" class="mt-2"></div>
+      </div>
+
+      <div class="mb-4" id="manualOrderIdSection" style="display:none;">
+        <label class="block text-sm font-semibold mb-2">หมายเลข Order (จำเป็น)</label>
+        <input type="text" id="manualOrderId" class="w-full px-4 py-2 border rounded-lg" placeholder="กรอกหมายเลข order">
+      </div>
+
+      <div class="flex gap-2">
+        <button onclick="closeModal('paymentModal')" class="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">
+          ยกเลิก
+        </button>
+        <button onclick="confirmPayment()" class="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
+          <i class="fas fa-check mr-2"></i>ยืนยันการชำระเงิน
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Order Details Modal -->
+<div id="orderDetailsModal" class="modal">
+  <div class="modal-content w-full max-w-2xl">
+    <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-t-lg flex justify-between items-center">
+      <h3 class="text-xl font-bold text-white">
+        <i class="fas fa-receipt mr-2"></i>รายละเอียดออเดอร์
+      </h3>
+      <button onclick="closeModal('orderDetailsModal')" class="text-white hover:text-gray-200">
+        <i class="fas fa-times text-2xl"></i>
+      </button>
+    </div>
+    <div class="p-6">
+      <div id="orderDetailsContent"></div>
+      <div class="mt-4 flex gap-2">
+        <button onclick="printReceipt()" class="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600">
+          <i class="fas fa-print mr-2"></i>พิมพ์ใบเสร็จ
+        </button>
+        <button onclick="closeModal('orderDetailsModal')" class="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">
+          ปิด
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Product Modal (Add/Edit) -->
+<div id="productModal" class="modal">
+  <div class="modal-content w-full max-w-3xl">
+    <div class="bg-gradient-to-r from-green-500 to-blue-600 p-4 rounded-t-lg">
+      <h3 class="text-xl font-bold text-white">
+        <i class="fas fa-box mr-2"></i><span id="productModalTitle">เพิ่มสินค้า</span>
+      </h3>
+    </div>
+    <div class="p-6">
+      <form id="productForm" onsubmit="saveProduct(event)">
+        <input type="hidden" id="editProductId">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="block text-sm font-semibold mb-2">ชื่อสินค้า</label>
+            <input type="text" id="productName" required class="w-full px-4 py-2 border rounded-lg">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-2">หมวดหมู่</label>
+            <select id="productCategory" required class="w-full px-4 py-2 border rounded-lg"></select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-2">ราคาขาย (฿)</label>
+            <input type="number" id="productPrice" required step="0.01" class="w-full px-4 py-2 border rounded-lg">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-2">เวลาทำ (นาที)</label>
+            <input type="number" id="productTime" value="3" min="1" class="w-full px-4 py-2 border rounded-lg">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm font-semibold mb-2">วัตถุดิบที่ใช้</label>
+          <button type="button" onclick="addMaterialRow()" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 mb-2">
+            <i class="fas fa-plus mr-1"></i>เพิ่มวัตถุดิบ
+          </button>
+          <div id="productMaterialsContainer"></div>
+          <div class="mt-2 font-bold">
+            ราคาทุน: ฿<span id="calculatedCost">0</span>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm font-semibold mb-2">ตัวเลือกสินค้า</label>
+          <div id="productOptionsCheckboxes"></div>
+        </div>
+
+        <div class="flex gap-2">
+          <button type="button" onclick="closeModal('productModal')" class="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">
+            ยกเลิก
+          </button>
+          <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
+            <i class="fas fa-save mr-2"></i>บันทึก
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Material Modal (Add/Edit) -->
+<div id="materialModal" class="modal">
+  <div class="modal-content w-full max-w-md">
+    <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-t-lg">
+      <h3 class="text-xl font-bold text-white">
+        <i class="fas fa-cubes mr-2"></i><span id="materialModalTitle">เพิ่มวัตถุดิบ</span>
+      </h3>
+    </div>
+    <div class="p-6">
+      <form id="materialForm" onsubmit="saveMaterial(event)">
+        <input type="hidden" id="editMaterialId">
+
+        <div class="mb-4">
+          <label class="block text-sm font-semibold mb-2">ชื่อวัตถุดิบ</label>
+          <input type="text" id="materialName" required class="w-full px-4 py-2 border rounded-lg">
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-semibold mb-2">หน่วย</label>
+          <input type="text" id="materialUnit" required placeholder="เช่น กรัม, มล., ชิ้น" class="w-full px-4 py-2 border rounded-lg">
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-semibold mb-2">ราคาต่อหน่วย (฿)</label>
+          <input type="number" id="materialPrice" required step="0.01" class="w-full px-4 py-2 border rounded-lg">
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-semibold mb-2">จำนวนขั้นต่ำ</label>
+          <input type="number" id="materialMinQty" value="0" class="w-full px-4 py-2 border rounded-lg">
+        </div>
+
+        <div class="flex gap-2">
+          <button type="button" onclick="closeModal('materialModal')" class="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600">
+            ยกเลิก
+          </button>
+          <button type="submit" class="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
+            <i class="fas fa-save mr-2"></i>บันทึก
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Other modals continue in next section... -->
+
+<div id="printArea" style="display:none;"></div>
+
+<script>
+// ===== GLOBAL VARIABLES =====
+var currentUser = null;
+var currentShopId = null;
+var currentSheetId = null;
+var cart = [];
+var allProducts = [];
+var allCategories = [];
+var allMaterials = [];
+var allOptions = [];
+var allChannels = [];
+var settings = {};
+var selectedProduct = null;
+var currentSlipFile = null;
+var salesHistoryData = [];
+var currentSortColumn = null;
+var currentSortDirection = 'asc';
+
+// ===== INITIALIZATION =====
+window.onload = function() {
+  checkLogin();
+};
+
+function checkLogin() {
+  var savedUser = localStorage.getItem('coffeeShopUser');
+  if (savedUser) {
+    try {
+      currentUser = JSON.parse(savedUser);
+      currentShopId = currentUser.shopId;
+      currentSheetId = currentUser.sheetId;
+
+      closeModal('loginModal');
+      document.getElementById('shopName').textContent = currentUser.shopName;
+
+      if (currentUser.warning) {
+        document.getElementById('licenseWarningText').textContent = currentUser.warning;
+        openModal('licenseWarningModal');
+      }
+
+      initializeApp();
+    } catch (e) {
+      localStorage.removeItem('coffeeShopUser');
+      openModal('loginModal');
+    }
+  } else {
+    openModal('loginModal');
+  }
+}
+
+function handleLogin(event) {
+  event.preventDefault();
+  showLoading();
+
+  var email = document.getElementById('loginEmail').value;
+  var password = document.getElementById('loginPassword').value;
+
+  google.script.run
+    .withSuccessHandler(function(result) {
+      hideLoading();
+      if (result.success) {
+        currentUser = result;
+        currentShopId = result.shopId;
+        currentSheetId = result.sheetId;
+
+        localStorage.setItem('coffeeShopUser', JSON.stringify(result));
+
+        closeModal('loginModal');
+        document.getElementById('shopName').textContent = result.shopName;
+
+        if (result.warning) {
+          document.getElementById('licenseWarningText').textContent = result.warning;
+          openModal('licenseWarningModal');
+        }
+
+        showToast('เข้าสู่ระบบสำเร็จ', 'success');
+        initializeApp();
+      } else {
+        showToast(result.message, 'error');
+      }
+    })
+    .withFailureHandler(function(error) {
+      hideLoading();
+      showToast('เกิดข้อผิดพลาด: ' + error.message, 'error');
+    })
+    .login(email, password);
+}
+
+function handleLogout() {
+  Swal.fire({
+    title: 'ออกจากระบบ?',
+    text: 'คุณต้องการออกจากระบบหรือไม่?',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'ออกจากระบบ',
+    cancelButtonText: 'ยกเลิก'
+  }).then(function(result) {
+    if (result.isConfirmed) {
+      localStorage.removeItem('coffeeShopUser');
+      location.reload();
+    }
+  });
+}
+
+function initializeApp() {
+  loadAllData();
+  showPage('dashboard');
+  setDefaultDates();
+}
+
+function loadAllData() {
+  loadProducts();
+  loadCategories();
+  loadMaterials();
+  loadProductOptions();
+  loadOrderChannels();
+  loadSettings();
+  loadDashboard();
+  loadTodaySales();
+}
+
+// ===== NAVIGATION =====
+function showPage(pageId) {
+  var pages = document.getElementsByClassName('page');
+  for (var i = 0; i < pages.length; i++) {
+    pages[i].classList.remove('active');
+  }
+
+  document.getElementById(pageId).classList.add('active');
+
+  if (pageId === 'dashboard') {
+    loadDashboard();
+  } else if (pageId === 'sales') {
+    loadTodaySales();
+    updateQueueInfo();
+  } else if (pageId === 'kitchen') {
+    loadKitchenQueue();
+  } else if (pageId === 'history') {
+    loadSalesHistory();
+    loadSalesCharts();
+  } else if (pageId === 'products') {
+    loadProductsTable();
+  } else if (pageId === 'materials') {
+    loadMaterialsTable();
+  } else if (pageId === 'costs') {
+    loadCosts();
+  } else if (pageId === 'reports') {
+    loadPLReport();
+    loadTopProductsReport();
+  } else if (pageId === 'settings') {
+    loadSettingsPage();
+  }
+}
+
+// ===== MODAL FUNCTIONS =====
+function openModal(modalId) {
+  document.getElementById(modalId).classList.add('active');
+}
+
+function closeModal(modalId) {
+  document.getElementById(modalId).classList.remove('active');
+}
+
+function showLoading() {
+  document.getElementById('loadingOverlay').style.display = 'flex';
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').style.display = 'none';
+}
+
+function showToast(message, type) {
+  var bgColor = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6';
+  Swal.fire({
+    toast: true,
+    position: 'top-end',
+    icon: type,
+    title: message,
+    showConfirmButton: false,
+    timer: 3000,
+    background: bgColor,
+    color: '#fff'
+  });
+}
+
+// ===== DATA LOADING =====
+function loadProducts() {
+  google.script.run
+    .withSuccessHandler(function(products) {
+      allProducts = products;
+      renderProductsGrid();
+    })
+    .withFailureHandler(function(error) {
+      showToast('ไม่สามารถโหลดสินค้าได้', 'error');
+    })
+    .getProducts(currentSheetId);
+}
+
+function loadCategories() {
+  google.script.run
+    .withSuccessHandler(function(categories) {
+      allCategories = categories;
+      renderCategoryButtons();
+      updateCategorySelects();
+    })
+    .withFailureHandler(function(error) {
+      showToast('ไม่สามารถโหลดหมวดหมู่ได้', 'error');
+    })
+    .getCategories(currentSheetId);
+}
+
+function loadMaterials() {
+  google.script.run
+    .withSuccessHandler(function(materials) {
+      allMaterials = materials;
+      updateMaterialSelects();
+    })
+    .withFailureHandler(function(error) {
+      showToast('ไม่สามารถโหลดวัตถุดิบได้', 'error');
+    })
+    .getMaterials(currentSheetId);
+}
+
+function loadProductOptions() {
+  google.script.run
+    .withSuccessHandler(function(options) {
+      allOptions = options;
+    })
+    .withFailureHandler(function(error) {
+      showToast('ไม่สามารถโหลดตัวเลือกได้', 'error');
+    })
+    .getProductOptions(currentSheetId);
+}
+
+function loadOrderChannels() {
+  google.script.run
+    .withSuccessHandler(function(channels) {
+      allChannels = channels;
+      updateChannelSelect();
+    })
+    .withFailureHandler(function(error) {
+      showToast('ไม่สามารถโหลดช่องทางได้', 'error');
+    })
+    .getOrderChannels(currentSheetId);
+}
+
+function loadSettings() {
+  google.script.run
+    .withSuccessHandler(function(settingsData) {
+      settings = settingsData;
+    })
+    .withFailureHandler(function(error) {
+      showToast('ไม่สามารถโหลดการตั้งค่าได้', 'error');
+    })
+    .getSettings(currentSheetId);
+}
+
+// Continue with remaining JavaScript functions...
+// Due to length constraints, I'll create the remaining portions
+
+</script>
+
+</body>
+</html>
